@@ -31,6 +31,16 @@ export const env = createEnv({
 		// Database
 		DATABASE_URL: z.string().url(),
 
+		// Usable API
+		USABLE_API_BASE_URL: z.string().url().default("https://usable.dev/api"),
+
+		// Flowcore
+		FLOWCORE_TENANT: z.string().min(1),
+		FLOWCORE_DATACORE: z.string().min(1),
+		FLOWCORE_WEBHOOK_BASE_URL: z.string().url(),
+		FLOWCORE_WEBHOOK_API_KEY: z.string().min(1),
+		FLOWCORE_TRANSFORMER_SECRET: z.string().min(1),
+
 		// Node Environment
 		NODE_ENV: z
 			.enum(["development", "test", "production"])
@@ -60,6 +70,16 @@ export const env = createEnv({
 
 		// Database
 		DATABASE_URL: process.env.DATABASE_URL,
+
+		// Usable API
+		USABLE_API_BASE_URL: process.env.USABLE_API_BASE_URL,
+
+		// Flowcore
+		FLOWCORE_TENANT: process.env.FLOWCORE_TENANT,
+		FLOWCORE_DATACORE: process.env.FLOWCORE_DATACORE,
+		FLOWCORE_WEBHOOK_BASE_URL: process.env.FLOWCORE_WEBHOOK_BASE_URL,
+		FLOWCORE_WEBHOOK_API_KEY: process.env.FLOWCORE_WEBHOOK_API_KEY,
+		FLOWCORE_TRANSFORMER_SECRET: process.env.FLOWCORE_TRANSFORMER_SECRET,
 
 		// Node Environment
 		NODE_ENV: process.env.NODE_ENV,

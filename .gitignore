@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# drizzle
+drizzle/
+
+# flowcore local config files (contain personal tenant overrides)
+flowcore.local.yml
+flowcore.scenario.local.yml
+flowcore.local.development.yml

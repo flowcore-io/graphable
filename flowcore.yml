@@ -1,0 +1,25 @@
+apiVersion: data-core.flowcore.io/v1
+kind: DataCore
+metadata:
+  name: graphable
+  tenant: graphable
+spec:
+  accessControl: private
+  deleteProtection: true
+  description: "Graphable control plane datacore for tenant and workspace management"
+
+---
+
+apiVersion: data-core.flowcore.io/v1
+kind: FlowType
+metadata:
+  name: graphable.tenant.0
+  tenant: graphable
+spec:
+  dataCore: graphable
+  description: "Graphable tenant management events"
+  eventTypes:
+    - name: tenant.linked.0
+      description: "A workspace was linked to a user as a Graphable tenant"
+    - name: tenant.unlinked.0
+      description: "A workspace was unlinked from a user"

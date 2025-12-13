@@ -1,8 +1,7 @@
-import { Button } from "@/components/ui/button";
-import { AlertCircle } from "lucide-react";
-import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { AlertCircle } from "lucide-react";
+import Link from "next/link";
 
 export default async function AuthErrorPage({
 	searchParams,
@@ -15,7 +14,8 @@ export default async function AuthErrorPage({
 	const errorMessages: Record<string, string> = {
 		Configuration: "There is a problem with the server configuration.",
 		AccessDenied: "You do not have permission to sign in.",
-		Verification: "The verification link may have expired or been already used.",
+		Verification:
+			"The verification link may have expired or been already used.",
 		OAuthSignin: "Error in constructing an authorization URL.",
 		OAuthCallback: "Error in handling the response from the OAuth provider.",
 		OAuthCreateAccount: "Could not create OAuth provider user in the database.",

@@ -18,7 +18,7 @@ COPY . .
 
 # Copy environment file if it exists (for Docker builds)
 # In production, env vars should be injected at runtime
-RUN if [ -f .env.docker ]; then cp .env.docker .env.local; fi
+RUN if [ -f env.docker ]; then cp env.docker .env.local; fi
 
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry

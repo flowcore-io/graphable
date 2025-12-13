@@ -38,6 +38,13 @@ Graphable is an AI-first graphical service where the primary interaction is via 
 
 Graphable is a control plane. Execution runs in a separate worker service that provides serverless Bun slots for event-driven transformers and on-demand API endpoints.
 
+## Runtime & Package Manager
+
+**This project uses Bun as the runtime and package manager.**
+- Always use `bun` commands instead of `npm` or `yarn`
+- Examples: `bun install`, `bun run dev`, `bun run build`, `bun add <package>`
+- Bun provides faster package installation and execution compared to Node.js
+
 **PRD**: [Graphable PRD (Lucreta-style) — Usable-backed Graph + DB + Transformers Service](usable://fragment/29e3f893-fe75-4497-b312-26df31102e5d)
 
 ## Fragment Type Mapping

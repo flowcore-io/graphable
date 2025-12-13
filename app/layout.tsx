@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
+import { Providers } from "@/components/providers";
 
 /* Usable Design System: Inter font family for all text */
 /* Weights: 300 (light), 400 (regular), 600 (semibold), 700 (bold), 900 (black) */
@@ -28,7 +29,7 @@ export default function RootLayout({
 	return (
 		<html lang="en" className={inter.variable}>
 			<body className={`${inter.variable} ${geistMono.variable} antialiased`}>
-				{children}
+				<Providers>{children}</Providers>
 			</body>
 		</html>
 	);

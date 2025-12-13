@@ -32,6 +32,14 @@ WorkspaceId: 60c10ca2-4115-4c1a-b6d7-04ac39fd3938
 Workspace: Flowcore
 Workspace Fragment Types: knowledge, recipe, solution, template, architectural decision, commands, feature request, infrastructure, instruction set, issue, llm persona, llm rules, outage investigation, plan, prd, research, ticket, violation exception
 
+## Project Description
+
+Graphable is an AI-first graphical service where the primary interaction is via LLM agents in chat. Users create, update, and operate graphs and dashboards with strict customer isolation via Usable workspaces. Configuration and definitions (graphs, dashboards, queries, transformers) are stored in Usable fragments. Runtime processing is event-driven using Flowcore Pathways, and TypeScript transformers run on Bun to materialize read models in PostgreSQL. Graphable can provision PostgreSQL databases in Flowcore-owned Azure accounts and bill customers via Stripe with transparent, pass-through pricing plus a 20% margin.
+
+Graphable is a control plane. Execution runs in a separate worker service that provides serverless Bun slots for event-driven transformers and on-demand API endpoints.
+
+**PRD**: [Graphable PRD (Lucreta-style) — Usable-backed Graph + DB + Transformers Service](usable://fragment/29e3f893-fe75-4497-b312-26df31102e5d)
+
 ## Fragment Type Mapping
 
 The following fragment types are available in this workspace:

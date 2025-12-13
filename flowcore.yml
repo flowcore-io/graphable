@@ -1,0 +1,38 @@
+tenant: ${FLOWCORE_TENANT}
+
+dataCore:
+  name: ${FLOWCORE_DATACORE}
+  deleteProtection: true
+  description: "Graphable control plane datacore for tenant and workspace management"
+  flowTypes:
+    graphable.tenant.0:
+      description: "Graphable tenant management events"
+      eventTypes:
+        tenant.linked.0:
+          description: "A workspace was linked to a user as a Graphable tenant"
+        tenant.unlinked.0:
+          description: "A workspace was unlinked from a user"
+
+scenario:
+  name: "graphable-control-plane"
+  description: "Event processing for Graphable control plane"
+  prefix: "graphable"
+
+  transformers:
+    control-plane:
+      description: "Graphable control plane transformer"
+      dataCore: ${FLOWCORE_DATACORE}
+      flowType: graphable.tenant.0
+      shell: flowcoreio/adapter-nodejs-transformer-shell:2.4.1
+      events:
+        - tenant.linked.0
+        - tenant.unlinked.0
+      parameters:
+        - name: PROXY_ENDPOINT
+          type: manual
+          value: "${FLOWCORE_WEBHOOK_BASE_URL}/api/transformer"
+        - name: PROXY_HEADER_SECRET
+          type: secret
+          value: ${FLOWCORE_TRANSFORMER_SECRET}
+      blueprint:
+        artifactUrl: "https://flowcore-public-runtimes.s3.eu-west-1.amazonaws.com/transformer-proxy-1.4.1.zip"

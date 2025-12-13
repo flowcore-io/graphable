@@ -5,9 +5,14 @@ import { authOptions } from "./lib/auth";
 export default withAuth(
 	function middleware(req) {
 		const isOnAuthPage = req.nextUrl.pathname.startsWith("/auth");
+		const isOnOnboardingPage = req.nextUrl.pathname.startsWith("/onboarding");
 
 		// Check if token has MissingUsableUserId error - redirect to error page
-		if (req.nextauth.token?.error === "MissingUsableUserId" && !isOnAuthPage) {
+		if (
+			req.nextauth.token?.error === "MissingUsableUserId" &&
+			!isOnAuthPage &&
+			!isOnOnboardingPage
+		) {
 			return NextResponse.redirect(
 				new URL("/auth/error?error=MissingUsableUserId", req.url),
 			);
@@ -30,9 +35,16 @@ export default withAuth(
 		callbacks: {
 			authorized: ({ req, token }) => {
 				const isOnAuthPage = req.nextUrl.pathname.startsWith("/auth");
+				const isOnOnboardingPage =
+					req.nextUrl.pathname.startsWith("/onboarding");
 
 				// Always allow access to auth pages
 				if (isOnAuthPage) {
+					return true;
+				}
+
+				// Always allow access to onboarding pages (they handle their own checks)
+				if (isOnOnboardingPage) {
 					return true;
 				}
 

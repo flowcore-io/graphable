@@ -1,0 +1,11 @@
+development:
+  proxyEndpoints:
+    tenant:
+      description: "Graphable control plane transformer"
+      dataCore: graphable
+      flowType: graphable.tenant.0
+      events:
+        - tenant.linked.0
+        - tenant.unlinked.0
+      endpoints:
+        - "transformer"

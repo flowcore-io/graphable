@@ -1,0 +1,16 @@
+apiVersion: data-core.flowcore.io/v1
+kind: DataCore
+metadata:
+  name: graphable
+  tenant: <your-tenant>
+spec:
+  deleteProtection: false
+
+---
+
+apiVersion: data-core.flowcore.io/v1
+kind: FlowType
+metadata:
+  name: graphable.tenant.0
+  tenant: <your-tenant>
+spec: {}

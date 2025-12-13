@@ -8,10 +8,11 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { useWorkspace } from "@/lib/context/workspace-context";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 // Alert component for error messages
 function Alert({
@@ -62,6 +63,21 @@ export default function LinkWorkspacePage() {
 	const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(
 		null,
 	);
+	const [searchQuery, setSearchQuery] = useState("");
+
+	// Filter workspaces based on search query
+	const filteredWorkspaces = useMemo(() => {
+		if (!searchQuery.trim()) {
+			return workspaces;
+		}
+
+		const query = searchQuery.toLowerCase().trim();
+		return workspaces.filter(
+			(workspace) =>
+				workspace.name.toLowerCase().includes(query) ||
+				workspace.description?.toLowerCase().includes(query),
+		);
+	}, [workspaces, searchQuery]);
 
 	// Fetch workspaces on mount
 	useEffect(() => {
@@ -173,38 +189,56 @@ export default function LinkWorkspacePage() {
 							</p>
 						) : (
 							<div className="space-y-2">
-								{workspaces.map((workspace) => (
-									<Card
-										key={workspace.id}
-										className={`cursor-pointer transition-colors ${
-											selectedWorkspaceId === workspace.id
-												? "border-primary bg-primary/5"
-												: "hover:bg-muted/50"
-										}`}
-										onClick={() => setSelectedWorkspaceId(workspace.id)}
-									>
-										<CardContent className="p-4">
-											<div className="flex items-center justify-between">
-												<div>
-													<h3 className="font-semibold">{workspace.name}</h3>
-													{workspace.description && (
-														<p className="text-sm text-muted-foreground">
-															{workspace.description}
-														</p>
+								<Input
+									type="text"
+									placeholder="Search workspaces by name or description..."
+									value={searchQuery}
+									onChange={(e) => setSearchQuery(e.target.value)}
+									className="w-full"
+								/>
+								{filteredWorkspaces.length === 0 ? (
+									<p className="text-sm text-muted-foreground py-4 text-center">
+										No workspaces match your search.
+									</p>
+								) : (
+									<div className="space-y-1.5">
+										{filteredWorkspaces.map((workspace) => (
+											<button
+												key={workspace.id}
+												type="button"
+												onClick={() => setSelectedWorkspaceId(workspace.id)}
+												className={`w-full rounded-md border p-3 text-left transition-colors ${
+													selectedWorkspaceId === workspace.id
+														? "border-primary bg-primary/5"
+														: "border-border hover:bg-muted/50"
+												}`}
+											>
+												<div className="flex items-start justify-between gap-3">
+													<div className="flex-1 min-w-0">
+														<div className="flex items-center gap-2">
+															<h3 className="text-sm font-medium truncate">
+																{workspace.name}
+															</h3>
+															<span className="text-xs text-muted-foreground shrink-0">
+																{workspace.visibility === "private"
+																	? "Private"
+																	: "Public"}
+															</span>
+														</div>
+														{workspace.description && (
+															<p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+																{workspace.description}
+															</p>
+														)}
+													</div>
+													{selectedWorkspaceId === workspace.id && (
+														<div className="h-2 w-2 rounded-full bg-primary shrink-0 mt-1.5" />
 													)}
-													<p className="text-xs text-muted-foreground mt-1">
-														{workspace.visibility === "private"
-															? "Private"
-															: "Public"}
-													</p>
 												</div>
-												{selectedWorkspaceId === workspace.id && (
-													<div className="h-2 w-2 rounded-full bg-primary" />
-												)}
-											</div>
-										</CardContent>
-									</Card>
-								))}
+											</button>
+										))}
+									</div>
+								)}
 							</div>
 						)}
 					</div>

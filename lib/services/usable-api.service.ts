@@ -92,13 +92,13 @@ export class UsableApiService {
 	/**
 	 * List user's accessible workspaces
 	 * Returns all accessible workspaces - filtering to owner-only should be done client-side
-	 * or via the /api/workspaces/accessible endpoint
+	 * or via the /workspaces/accessible endpoint
 	 */
 	async listUserWorkspaces(accessToken: string): Promise<UsableWorkspace[]> {
 		const response = await this.request<{
 			workspaces?: UsableWorkspace[];
 			success?: boolean;
-		}>("/api/workspaces", {
+		}>("/workspaces", {
 			method: "GET",
 			accessToken,
 		});
@@ -123,7 +123,7 @@ export class UsableApiService {
 		const response = await this.request<{
 			workspace?: UsableWorkspace;
 			success?: boolean;
-		}>(`/api/workspaces/${workspaceId}`, {
+		}>(`/workspaces/${workspaceId}`, {
 			method: "GET",
 			accessToken,
 		});
@@ -145,7 +145,7 @@ export class UsableApiService {
 		const response = await this.request<{
 			fragmentTypes?: UsableFragmentType[];
 			success?: boolean;
-		}>(`/api/workspaces/${workspaceId}/fragment-types`, {
+		}>(`/workspaces/${workspaceId}/fragment-types`, {
 			method: "GET",
 			accessToken,
 		});
@@ -168,7 +168,7 @@ export class UsableApiService {
 		const response = await this.request<{
 			success: boolean;
 			fragmentType: UsableFragmentType;
-		}>(`/api/workspaces/${workspaceId}/fragment-types`, {
+		}>(`/workspaces/${workspaceId}/fragment-types`, {
 			method: "POST",
 			accessToken,
 			body: JSON.stringify(fragmentType),
@@ -188,7 +188,7 @@ export class UsableApiService {
 		const response = await this.request<{
 			success: boolean;
 			fragment: UsableFragment;
-		}>("/api/memory-fragments", {
+		}>("/memory-fragments", {
 			method: "POST",
 			accessToken,
 			body: JSON.stringify({
@@ -208,7 +208,7 @@ export class UsableApiService {
 		fragmentId: string,
 		accessToken: string,
 	): Promise<UsableFragment> {
-		return this.request<UsableFragment>(`/api/memory-fragments/${fragmentId}`, {
+		return this.request<UsableFragment>(`/memory-fragments/${fragmentId}`, {
 			method: "GET",
 			accessToken,
 			headers: {

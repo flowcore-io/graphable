@@ -7,7 +7,7 @@ on:
     branches: ["main"]
 
 env:
-  BUN_VERSION: "1.1.0"
+  BUN_VERSION: "1.2.13"
   SKIP_ENV_VALIDATION: true
 
 permissions:

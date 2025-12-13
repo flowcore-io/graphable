@@ -7,10 +7,7 @@ export default withAuth(
 		const isOnAuthPage = req.nextUrl.pathname.startsWith("/auth");
 
 		// Check if token has MissingUsableUserId error - redirect to error page
-		if (
-			req.nextauth.token?.error === "MissingUsableUserId" &&
-			!isOnAuthPage
-		) {
+		if (req.nextauth.token?.error === "MissingUsableUserId" && !isOnAuthPage) {
 			return NextResponse.redirect(
 				new URL("/auth/error?error=MissingUsableUserId", req.url),
 			);

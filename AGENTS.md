@@ -1,37 +1,3 @@
-<<<USABLE_MCP_SYSTEM_PROMPT_START>>>
-# 🧠 Usable MCP - SYSTEM PROMPT (LONG-TERM MEMORY)
-
-This is your main way of storing and fetching data. Always consult it before starting a task and whenever you need more context.
-
-Detailed instructions for each tool are embedded in its MCP description; read them before you call the tool.
-
-## Search Discipline
-- Start or resume every task with `agentic-search-fragments` (vector-based semantic search that understands meaning, not just keywords) and rerun whenever scope expands or you lack certainty.
-- Provide workspace scope and begin with `repo:graphable` tags; iterate until the tool reports `decision: "SUFFICIENT"`.
-- If the agentic tool is unavailable, fall back to `search-memory-fragments` (also semantic vector search), then return to the agentic loop as soon as possible.
-- Respect the tool's safety rails—if you see `invocationLimitReached: true`, stop rerunning the tool and document the uncovered gap instead. Reset the attempt counter whenever you start a materially different search objective.
-- Use `get-memory-fragment-content` for deep dives on selected fragment IDs and cite titles plus timestamps in your responses.
-- Use `list-memory-fragments` for traditional filtering by type, tags, or date ranges when you need metadata listings rather than semantic search.
-
-## Planning Loop
-- **Plan**: Outline sub-goals and the tools you will invoke.
-- **Act**: Execute tools exactly as their descriptions prescribe, keeping actions minimal and verifiable.
-- **Reflect**: After each tool batch, summarise coverage, note freshness, and decide whether to iterate or escalate.
-
-## Verification & Documentation
-- Verify code (lint, tests, manual checks) or obtain user confirmation before relying on conclusions.
-- Capture verified insights by using `create-memory-fragment` or `update-memory-fragment`; include repository tags and residual risks so the team benefits immediately.
-
-## Freshness & Escalation
-- Prefer fragments updated within the last 90 days; flag stale sources.
-- If internal knowledge conflicts or is insufficient after 2–3 iterations, escalate to external research and reconcile findings with workspace standards.
-
-
-Repository: graphable
-WorkspaceId: 60c10ca2-4115-4c1a-b6d7-04ac39fd3938
-Workspace: Flowcore
-Workspace Fragment Types: knowledge, recipe, solution, template, architectural decision, commands, feature request, infrastructure, instruction set, issue, llm persona, llm rules, outage investigation, plan, prd, research, ticket, violation exception
-
 ## Project Description
 
 Graphable is an AI-first graphical service where the primary interaction is via LLM agents in chat. Users create, update, and operate graphs and dashboards with strict customer isolation via Usable workspaces. Configuration and definitions (graphs, dashboards, queries, transformers) are stored in Usable fragments. Runtime processing is event-driven using Flowcore Pathways, and TypeScript transformers run on Bun to materialize read models in PostgreSQL. Graphable can provision PostgreSQL databases in Flowcore-owned Azure accounts and bill customers via Stripe with transparent, pass-through pricing plus a 20% margin.
@@ -41,11 +7,58 @@ Graphable is a control plane. Execution runs in a separate worker service that p
 ## Runtime & Package Manager
 
 **This project uses Bun as the runtime and package manager.**
+
 - Always use `bun` commands instead of `npm` or `yarn`
 - Examples: `bun install`, `bun run dev`, `bun run build`, `bun add <package>`
 - Bun provides faster package installation and execution compared to Node.js
 
-**PRD**: [Graphable PRD (Lucreta-style) — Usable-backed Graph + DB + Transformers Service](usable://fragment/29e3f893-fe75-4497-b312-26df31102e5d)
+**PRD**: [Graphable PRD (Lucreta-style) — Usable-backed Graph + DB + Transformers Service](https://usable.dev/dashboard/workspaces/60c10ca2-4115-4c1a-b6d7-04ac39fd3938/fragments/29e3f893-fe75-4497-b312-26df31102e5d)
+
+## Completed Implementations
+
+**Note**: After completing an implementation from a plan, document it in Usable as a Solution fragment, then add a bulleted list entry here. Format: `- **Task Name** (YYYY-MM-DD): [concise paragraph description]. **Documentation**: [fragment link]`. Fragment links should use format: `https://usable.dev/dashboard/workspaces/60c10ca2-4115-4c1a-b6d7-04ac39fd3938/fragments/<fragment-id>`
+
+- **FR1 - Usable SSO Authentication (NextAuth v4 + Keycloak)** (2024-12-12): Implemented complete authentication system for Graphable using Usable SSO via Keycloak OIDC with NextAuth.js v4.24.11. Includes environment validation with `@t3-oss/env-nextjs`, PostgreSQL database setup with Drizzle ORM, automatic user provisioning on first login via `getOrCreateUser()` service, JWT session management with server-managed HTTP-only cookies, manual extraction of `usable_user_id` claim from Keycloak ID tokens, token refresh handling, redirect callback to prevent authentication flow issues, route protection middleware, and sign-in/error pages. All tokens are stored server-side only and never exposed to the browser. Implementation follows Usable Chat patterns for consistency. **Documentation**: [Graphable FR1 - Usable SSO Authentication Implementation](https://usable.dev/dashboard/workspaces/60c10ca2-4115-4c1a-b6d7-04ac39fd3938/fragments/16098b64-6ceb-4b8b-8d03-52961c5e91e7)
+
+---
+
+<<<USABLE_MCP_SYSTEM_PROMPT_START>>>
+
+# 🧠 Usable MCP - SYSTEM PROMPT (LONG-TERM MEMORY)
+
+This is your main way of storing and fetching data. Always consult it before starting a task and whenever you need more context.
+
+Detailed instructions for each tool are embedded in its MCP description; read them before you call the tool.
+
+## Search Discipline
+
+- Start or resume every task with `agentic-search-fragments` (vector-based semantic search that understands meaning, not just keywords) and rerun whenever scope expands or you lack certainty.
+- Provide workspace scope and begin with `repo:graphable` tags; iterate until the tool reports `decision: "SUFFICIENT"`.
+- If the agentic tool is unavailable, fall back to `search-memory-fragments` (also semantic vector search), then return to the agentic loop as soon as possible.
+- Respect the tool's safety rails—if you see `invocationLimitReached: true`, stop rerunning the tool and document the uncovered gap instead. Reset the attempt counter whenever you start a materially different search objective.
+- Use `get-memory-fragment-content` for deep dives on selected fragment IDs and cite titles plus timestamps in your responses.
+- Use `list-memory-fragments` for traditional filtering by type, tags, or date ranges when you need metadata listings rather than semantic search.
+
+## Planning Loop
+
+- **Plan**: Outline sub-goals and the tools you will invoke.
+- **Act**: Execute tools exactly as their descriptions prescribe, keeping actions minimal and verifiable.
+- **Reflect**: After each tool batch, summarise coverage, note freshness, and decide whether to iterate or escalate.
+
+## Verification & Documentation
+
+- Verify code (lint, tests, manual checks) or obtain user confirmation before relying on conclusions.
+- Capture verified insights by using `create-memory-fragment` or `update-memory-fragment`; include repository tags and residual risks so the team benefits immediately.
+
+## Freshness & Escalation
+
+- Prefer fragments updated within the last 90 days; flag stale sources.
+- If internal knowledge conflicts or is insufficient after 2–3 iterations, escalate to external research and reconcile findings with workspace standards.
+
+Repository: graphable
+WorkspaceId: 60c10ca2-4115-4c1a-b6d7-04ac39fd3938
+Workspace: Flowcore
+Workspace Fragment Types: knowledge, recipe, solution, template, architectural decision, commands, feature request, infrastructure, instruction set, issue, llm persona, llm rules, outage investigation, plan, prd, research, ticket, violation exception
 
 ## Fragment Type Mapping
 
@@ -69,9 +82,9 @@ The following fragment types are available in this workspace:
 - **Research**: `ca7aa44b-04a5-44dd-b2bf-cfedc1dbba2f` - Research information done with the express purpose of being implemented at a later date.
 - **Ticket**: `6b8ea561-4869-44d5-8b19-4a2039a3a387` - Items of things to do in development projects that we work on (backlog), always linked to a repo and tagged with status, milestone, and phases
 - **Violation Exception**: `6bf89736-f8f1-4a9b-82f4-f9d47dbdab2a` - Violation exceptions and reasons for these exceptions and who authorised them, these need to contain the Github username that approved them and the repository and commit they are tied to as well as a detailed explanation of why the exception is made.
-	
 
 ## Fragment Type Cheat Sheet
+
 - **Knowledge:** reference material, background, concepts.
 - **Recipe:** human step-by-step guides and tutorials.
 - **Solution:** fixes, troubleshooting steps, postmortems.
@@ -82,6 +95,6 @@ The following fragment types are available in this workspace:
 
 Before choosing, review the workspace fragment type mapping to spot custom types that may fit better than the defaults.
 
-Quick picker: “How to…” → Recipe · “Fix…” → Solution · “Plan for…” → Plan · “Requirements…” → PRD · “What is…” → Knowledge · “Reusable pattern…” → Template · “LLM should execute…” → Instruction Set.
+Quick picker: "How to…" → Recipe · "Fix…" → Solution · "Plan for…" → Plan · "Requirements…" → PRD · "What is…" → Knowledge · "Reusable pattern…" → Template · "LLM should execute…" → Instruction Set.
 
 <<<USABLE_MCP_SYSTEM_PROMPT_END>>>

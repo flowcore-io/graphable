@@ -1,8 +1,8 @@
+import { env } from "@/lib/env";
+import { getOrCreateUser } from "@/lib/services/user.service";
 import type { DefaultSession, NextAuthOptions } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import KeycloakProvider from "next-auth/providers/keycloak";
-import { env } from "@/lib/env";
-import { getOrCreateUser } from "@/lib/services/user.service";
 
 /**
  * Decode JWT ID token and extract usable_user_id claim

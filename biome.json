@@ -61,9 +61,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "components/ui/**"
-      ],
+      "includes": ["components/ui/**"],
       "linter": {
         "rules": {
           "a11y": {
@@ -75,9 +73,7 @@
       }
     },
     {
-      "includes": [
-        "lib/pathways/**"
-      ],
+      "includes": ["lib/pathways/**"],
       "linter": {
         "rules": {
           "suspicious": {
@@ -87,9 +83,7 @@
       }
     },
     {
-      "includes": [
-        "lib/services/tenant.service.ts"
-      ],
+      "includes": ["lib/services/tenant.service.ts"],
       "linter": {
         "rules": {
           "suspicious": {
@@ -99,9 +93,7 @@
       }
     },
     {
-      "includes": [
-        "components/component-example.tsx"
-      ],
+      "includes": ["components/component-example.tsx"],
       "linter": {
         "rules": {
           "performance": {

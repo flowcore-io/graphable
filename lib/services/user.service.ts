@@ -1,6 +1,6 @@
-import { db } from "@/db";
-import { type User, users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { db } from "@/db"
+import { type User, users } from "@/db/schema"
+import { eq } from "drizzle-orm"
 
 /**
  * Get or create a user by usableUserId.
@@ -11,47 +11,39 @@ import { eq } from "drizzle-orm";
  * Users are sourced from Usable; this local record is a compatibility shim for first-login user creation.
  */
 export async function getOrCreateUser(
-	usableUserId: string,
-	userData: { email: string; name?: string; image?: string },
+  usableUserId: string,
+  userData: { email: string; name?: string; image?: string }
 ): Promise<User> {
-	// Try to get existing user
-	const existing = await db
-		.select()
-		.from(users)
-		.where(eq(users.usableUserId, usableUserId))
-		.limit(1);
+  // Try to get existing user
+  const existing = await db.select().from(users).where(eq(users.usableUserId, usableUserId)).limit(1)
 
-	if (existing[0]) {
-		return existing[0];
-	}
+  if (existing[0]) {
+    return existing[0]
+  }
 
-	// Create new user (idempotent - handles race conditions)
-	try {
-		const [newUser] = await db
-			.insert(users)
-			.values({
-				usableUserId,
-				email: userData.email,
-				name: userData.name,
-				image: userData.image,
-			})
-			.returning();
+  // Create new user (idempotent - handles race conditions)
+  try {
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        usableUserId,
+        email: userData.email,
+        name: userData.name,
+        image: userData.image,
+      })
+      .returning()
 
-		return newUser;
-	} catch (error) {
-		// Handle race condition - user was created between check and insert
-		// Re-query to get the existing user
-		const user = await db
-			.select()
-			.from(users)
-			.where(eq(users.usableUserId, usableUserId))
-			.limit(1);
+    return newUser
+  } catch (error) {
+    // Handle race condition - user was created between check and insert
+    // Re-query to get the existing user
+    const user = await db.select().from(users).where(eq(users.usableUserId, usableUserId)).limit(1)
 
-		if (user[0]) {
-			return user[0];
-		}
+    if (user[0]) {
+      return user[0]
+    }
 
-		// If user still doesn't exist, re-throw the error
-		throw error;
-	}
+    // If user still doesn't exist, re-throw the error
+    throw error
+  }
 }

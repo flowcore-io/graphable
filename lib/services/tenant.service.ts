@@ -31,7 +31,7 @@ export async function getTenantLinkByWorkspace(workspaceId: string): Promise<Ten
 export async function createTenantLink(
   usableUserId: string,
   workspaceId: string,
-  sessionPathway: SessionPathwayBuilder<any>,
+  sessionPathway: SessionPathwayBuilder<any>
 ): Promise<void> {
   // Check if workspace is already linked to another user
   const existingLink = await getTenantLinkByWorkspace(workspaceId)
@@ -62,7 +62,7 @@ export async function createTenantLink(
  */
 export async function deleteTenantLink(
   usableUserId: string,
-  sessionPathway: SessionPathwayBuilder<any>,
+  sessionPathway: SessionPathwayBuilder<any>
 ): Promise<void> {
   // Check if tenant link exists
   const tenantLink = await getTenantLink(usableUserId)
@@ -86,8 +86,8 @@ export async function deleteTenantLink(
  */
 export async function validateWorkspaceAccess(
   workspaceId: string,
-  usableUserId: string,
-  accessToken: string,
+  _usableUserId: string,
+  accessToken: string
 ): Promise<boolean> {
   try {
     const workspace = await usableApi.getWorkspace(workspaceId, accessToken)

@@ -38,7 +38,7 @@ export async function POST(request: Request) {
           error: "Invalid workspace ID",
           details: validationResult.error.issues,
         },
-        { status: 400 },
+        { status: 400 }
       )
     }
 
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
         {
           error: "Workspace is already linked to another user",
         },
-        { status: 409 },
+        { status: 409 }
       )
     }
 

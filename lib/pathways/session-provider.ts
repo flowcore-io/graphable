@@ -16,8 +16,8 @@ export interface SessionPathwayContext {
  * Enables automatic audit tracking for all events
  */
 export async function createSessionPathway(
-  request: NextRequest,
-  customSessionId?: string,
+  _request: NextRequest,
+  customSessionId?: string
 ): Promise<SessionPathwayContext> {
   // Get session from NextAuth
   const session = await getServerSession(authOptions)

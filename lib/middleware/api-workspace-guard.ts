@@ -43,7 +43,7 @@ export interface RequireWorkspaceOptions {
  */
 export function requireWorkspace<T = any>(
   handler: (req: NextRequest, context: { workspaceId: string; userId: string }) => Promise<NextResponse<T>>,
-  options: RequireWorkspaceOptions = {},
+  options: RequireWorkspaceOptions = {}
 ) {
   return async (req: NextRequest): Promise<NextResponse<T> | NextResponse<{ error: string }>> => {
     try {
@@ -79,7 +79,7 @@ export function requireWorkspace<T = any>(
             error: "Invalid workspace ID",
             details: validationResult.error.issues,
           },
-          { status: 400 },
+          { status: 400 }
         )
       }
 

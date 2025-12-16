@@ -51,3 +51,82 @@ export const pathwayState = pgTable(
     expiresAtIdx: index("pathway_state_expires_at_idx").on(table.expiresAt),
   })
 )
+
+// Cache tables removed - all data comes from Usable fragments
+// Fragment IDs are used directly as resource IDs (graphId, dashboardId, folderId)
+
+// Graph parameter definitions
+// Note: graphId is now a fragment ID (no separate cache table)
+export const graphParameters = pgTable(
+  "graph_parameters",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    graphId: uuid("graph_id").notNull(), // Fragment ID (Usable fragment ID used as graph ID)
+    name: varchar("name", { length: 255 }).notNull(),
+    type: varchar("type", { length: 50 }).notNull(), // string, number, boolean, date, timestamp, enum, string[], number[]
+    required: boolean("required").notNull().default(false),
+    defaultValue: text("default_value"), // JSON string for complex types
+    enumValues: text("enum_values"), // JSON array for enum type
+    minValue: varchar("min_value", { length: 50 }), // For number types
+    maxValue: varchar("max_value", { length: 50 }), // For number types
+    pattern: varchar("pattern", { length: 500 }), // Regex pattern for string types
+    sourceEventId: varchar("source_event_id", { length: 255 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    graphIdIdx: index("graph_parameters_graph_id_idx").on(table.graphId),
+    graphIdNameIdx: index("graph_parameters_graph_id_name_idx").on(table.graphId, table.name),
+  })
+)
+
+export type GraphParameter = typeof graphParameters.$inferSelect
+export type NewGraphParameter = typeof graphParameters.$inferInsert
+
+// Dashboard permissions (viewer/admin access)
+// Note: dashboardId is now a fragment ID (no separate cache table)
+export const dashboardPermissions = pgTable(
+  "dashboard_permissions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    dashboardId: uuid("dashboard_id").notNull(), // Fragment ID (Usable fragment ID used as dashboard ID)
+    userId: varchar("user_id", { length: 255 }).notNull(), // Usable user ID
+    role: varchar("role", { length: 50 }).notNull(), // "viewer" | "admin"
+    sourceEventId: varchar("source_event_id", { length: 255 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    dashboardIdIdx: index("dashboard_permissions_dashboard_id_idx").on(table.dashboardId),
+    userIdIdx: index("dashboard_permissions_user_id_idx").on(table.userId),
+    dashboardIdUserIdIdx: index("dashboard_permissions_dashboard_id_user_id_idx").on(table.dashboardId, table.userId),
+  })
+)
+
+export type DashboardPermission = typeof dashboardPermissions.$inferSelect
+export type NewDashboardPermission = typeof dashboardPermissions.$inferInsert
+
+// Parameter-level permissions for dashboards
+// Note: dashboardId is now a fragment ID (no separate cache table)
+export const parameterPermissions = pgTable(
+  "parameter_permissions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    dashboardId: uuid("dashboard_id").notNull(), // Fragment ID (Usable fragment ID used as dashboard ID)
+    parameterName: varchar("parameter_name", { length: 255 }).notNull(),
+    allowed: boolean("allowed").notNull().default(true), // Whether viewers can modify this parameter
+    sourceEventId: varchar("source_event_id", { length: 255 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    dashboardIdIdx: index("parameter_permissions_dashboard_id_idx").on(table.dashboardId),
+    dashboardIdParameterNameIdx: index("parameter_permissions_dashboard_id_parameter_name_idx").on(
+      table.dashboardId,
+      table.parameterName
+    ),
+  })
+)
+
+export type ParameterPermission = typeof parameterPermissions.$inferSelect
+export type NewParameterPermission = typeof parameterPermissions.$inferInsert

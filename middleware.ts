@@ -6,10 +6,16 @@ export default withAuth(
   function middleware(req) {
     const isOnAuthPage = req.nextUrl.pathname.startsWith("/auth")
     const isOnOnboardingPage = req.nextUrl.pathname.startsWith("/onboarding")
+    const isOnSignOutPage = req.nextUrl.pathname === "/auth/signout"
 
     // Check if token has MissingUsableUserId error - redirect to error page
     if (req.nextauth.token?.error === "MissingUsableUserId" && !isOnAuthPage && !isOnOnboardingPage) {
       return NextResponse.redirect(new URL("/auth/error?error=MissingUsableUserId", req.url))
+    }
+
+    // Allow signout page even when authenticated (needed for logout flow)
+    if (isOnSignOutPage) {
+      return NextResponse.next()
     }
 
     // Redirect to home if logged in and on auth page (but not if missing userId)

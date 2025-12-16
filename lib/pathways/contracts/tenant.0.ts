@@ -41,3 +41,6 @@ export const EventTenantUnlinkedSchema = z.object({
 // Type exports
 export type EventTenantLinked = z.infer<typeof EventTenantLinkedSchema>
 export type EventTenantUnlinked = z.infer<typeof EventTenantUnlinkedSchema>
+
+
+

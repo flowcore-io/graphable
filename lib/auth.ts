@@ -105,6 +105,7 @@ declare module "next-auth" {
       id: string // usable_user_id from token claim (required)
       accessToken?: string // Only available server-side
     } & DefaultSession["user"]
+    idToken?: string // For Keycloak RP-initiated logout
   }
 
   interface JWT {
@@ -315,6 +316,10 @@ export const authOptions: NextAuthOptions = {
           // Don't set accessToken, which will trigger re-authentication
         } else {
           session.user.accessToken = token.accessToken as string
+          // Expose idToken for Keycloak RP-initiated logout
+          if (token.idToken) {
+            session.idToken = token.idToken as string
+          }
         }
       }
       return session

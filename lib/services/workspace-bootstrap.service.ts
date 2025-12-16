@@ -1,3 +1,4 @@
+import { ulid } from "ulid"
 import type { FragmentInput, FragmentTypeInput } from "./usable-api.service"
 import { usableApi } from "./usable-api.service"
 
@@ -24,6 +25,12 @@ const REQUIRED_FRAGMENT_TYPES: Array<{
     description: "Dashboard definitions for Graphable",
     color: "#8b5cf6",
     icon: "layout-dashboard",
+  },
+  {
+    name: "dashboard-folders",
+    description: "Dashboard folder definitions for organizing dashboards",
+    color: "#10b981",
+    icon: "folder",
   },
   {
     name: "data-sources",
@@ -103,11 +110,13 @@ async function createBaseConfigFragments(workspaceId: string, accessToken: strin
   console.log(`Creating base config fragments for workspace: ${workspaceId}`)
 
   // Graphable Tenant Config (type: knowledge)
+  // Singleton fragment - use deterministic key for key-value store semantics
   const tenantConfigFragment: FragmentInput = {
     workspaceId,
     title: "Graphable Tenant Configuration",
     content: JSON.stringify(
       {
+        id: ulid(), // Sortable UUID (ULID) for the fragment
         version: GRAPHABLE_VERSION,
         workspaceId,
         createdAt: new Date().toISOString(),
@@ -123,6 +132,7 @@ async function createBaseConfigFragments(workspaceId: string, accessToken: strin
     tags: [GRAPHABLE_APP_TAG, "type:tenant-config", `version:${GRAPHABLE_VERSION}`],
     fragmentTypeId: "04a5fb62-1ba5-436c-acf7-f65f3a5ba6f6", // Knowledge type
     repository: "graphable",
+    key: "graphable:tenant-config", // Deterministic key for singleton lookup
   }
 
   // Instruction Set (type: instruction set)

@@ -9,3 +9,36 @@ development:
         - tenant.unlinked.0
       endpoints:
         - "transformer"
+    graph:
+      description: "Graphable graph lifecycle transformer"
+      dataCore: graphable
+      flowType: graphable.graph.0
+      events:
+        - graph.created.0
+        - graph.updated.0
+        - graph.deleted.0
+      endpoints:
+        - "transformer"
+    dashboard:
+      description: "Graphable dashboard lifecycle transformer"
+      dataCore: graphable
+      flowType: graphable.dashboard.0
+      events:
+        - dashboard.created.0
+        - dashboard.updated.0
+        - dashboard.deleted.0
+      endpoints:
+        - "transformer"
+    folder:
+      description: "Graphable folder lifecycle transformer"
+      dataCore: graphable
+      flowType: graphable.folder.0
+      events:
+        - folder.created.0
+        - folder.updated.0
+        - folder.deleted.0
+      endpoints:
+        - "transformer"
+
+
+

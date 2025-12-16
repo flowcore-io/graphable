@@ -26,6 +26,7 @@ export interface UsableFragment {
   workspaceId: string
   title: string
   summary?: string
+  content?: string // Fragment content (JSON string or markdown)
   fragmentTypeId: string
   status: "draft" | "published" | "archived"
   tags: string[]
@@ -49,6 +50,7 @@ export interface FragmentInput {
   repository?: string
   branch?: string
   fragmentTypeId: string
+  key?: string // Optional workspace-scoped key for deterministic lookup (key-value store semantics)
 }
 
 /**
@@ -146,6 +148,20 @@ export class UsableApiService {
   }
 
   /**
+   * Get fragment type ID by name (case-insensitive)
+   * Returns the fragment type ID for the given name, or null if not found
+   */
+  async getFragmentTypeIdByName(
+    workspaceId: string,
+    fragmentTypeName: string,
+    accessToken: string
+  ): Promise<string | null> {
+    const fragmentTypes = await this.getFragmentTypes(workspaceId, accessToken)
+    const found = fragmentTypes.find((type) => type.name.toLowerCase() === fragmentTypeName.toLowerCase())
+    return found?.id || null
+  }
+
+  /**
    * Create a custom fragment type in a workspace
    */
   async createFragmentType(
@@ -169,19 +185,54 @@ export class UsableApiService {
    * Create a memory fragment in a workspace
    */
   async createFragment(workspaceId: string, fragment: FragmentInput, accessToken: string): Promise<UsableFragment> {
-    const response = await this.request<{
-      success: boolean
-      fragment: UsableFragment
-    }>("/memory-fragments", {
+    const response = await this.request<unknown>("/memory-fragments", {
       method: "POST",
       accessToken,
+      headers: {
+        "X-Workspace-Id": workspaceId,
+      },
       body: JSON.stringify({
         ...fragment,
         workspaceId,
       }),
     })
 
-    return response.fragment
+    // Handle different response formats
+    // Format 1: { success: boolean, fragment: UsableFragment }
+    if (typeof response === "object" && response !== null && "fragment" in response) {
+      const wrapped = response as { fragment: UsableFragment }
+      if (wrapped.fragment && typeof wrapped.fragment === "object" && "id" in wrapped.fragment) {
+        return wrapped.fragment
+      }
+    }
+
+    // Format 2: { success: boolean, fragmentId: string, status: string, message: string }
+    // The API returns this format for async fragment creation
+    if (typeof response === "object" && response !== null && "fragmentId" in response) {
+      const asyncResponse = response as { fragmentId: string; status: string; message?: string }
+      // Return a minimal fragment object immediately - don't try to fetch since it's async
+      // The fragment will be available later, but we have the fragmentId we need
+      return {
+        id: asyncResponse.fragmentId,
+        workspaceId,
+        title: fragment.title,
+        summary: fragment.summary,
+        fragmentTypeId: fragment.fragmentTypeId,
+        status: "draft" as const, // Default to draft for async fragments
+        tags: fragment.tags || [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+    }
+
+    // Format 3: Direct UsableFragment object
+    if (typeof response === "object" && response !== null && "id" in response && !("fragmentId" in response)) {
+      return response as UsableFragment
+    }
+
+    // If we get here, the response format is unexpected
+    console.error("Unexpected createFragment response format:", JSON.stringify(response, null, 2))
+    throw new Error(`Unexpected response format from createFragment API: ${JSON.stringify(response)}`)
   }
 
   /**
@@ -190,6 +241,96 @@ export class UsableApiService {
   async getFragment(workspaceId: string, fragmentId: string, accessToken: string): Promise<UsableFragment> {
     return this.request<UsableFragment>(`/memory-fragments/${fragmentId}`, {
       method: "GET",
+      accessToken,
+      headers: {
+        "X-Workspace-Id": workspaceId,
+      },
+    })
+  }
+
+  /**
+   * List memory fragments by type and tags
+   * Endpoint: GET /api/memory-fragments?workspaceId={id}&fragmentTypeId={typeId}&tags={tags}
+   */
+  async listFragments(
+    workspaceId: string,
+    options: {
+      fragmentTypeId?: string
+      tags?: string[]
+      limit?: number
+      offset?: number
+    },
+    accessToken: string
+  ): Promise<UsableFragment[]> {
+    const params = new URLSearchParams({
+      workspaceId,
+    })
+
+    if (options.fragmentTypeId) {
+      params.append("fragmentTypeId", options.fragmentTypeId)
+    }
+
+    if (options.tags && options.tags.length > 0) {
+      for (const tag of options.tags) {
+        params.append("tags", tag)
+      }
+    }
+
+    if (options.limit) {
+      params.append("limit", options.limit.toString())
+    }
+
+    if (options.offset) {
+      params.append("offset", options.offset.toString())
+    }
+
+    const response = await this.request<{
+      fragments?: UsableFragment[]
+      success?: boolean
+    }>(`/memory-fragments?${params.toString()}`, {
+      method: "GET",
+      accessToken,
+    })
+
+    // Handle different response formats
+    if (Array.isArray(response)) {
+      return response
+    }
+    return response.fragments || []
+  }
+
+  /**
+   * Update a memory fragment
+   * Endpoint: PATCH /api/memory-fragments/{fragmentId}
+   */
+  async updateFragment(
+    workspaceId: string,
+    fragmentId: string,
+    fragmentData: Partial<FragmentInput>,
+    accessToken: string
+  ): Promise<UsableFragment> {
+    const response = await this.request<{
+      success: boolean
+      fragment: UsableFragment
+    }>(`/memory-fragments/${fragmentId}`, {
+      method: "PATCH",
+      accessToken,
+      headers: {
+        "X-Workspace-Id": workspaceId,
+      },
+      body: JSON.stringify(fragmentData),
+    })
+
+    return response.fragment
+  }
+
+  /**
+   * Delete a memory fragment
+   * Endpoint: DELETE /api/memory-fragments/{fragmentId}
+   */
+  async deleteFragment(workspaceId: string, fragmentId: string, accessToken: string): Promise<void> {
+    await this.request(`/memory-fragments/${fragmentId}`, {
+      method: "DELETE",
       accessToken,
       headers: {
         "X-Workspace-Id": workspaceId,

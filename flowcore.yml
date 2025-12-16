@@ -23,3 +23,57 @@ spec:
       description: "A workspace was linked to a user as a Graphable tenant"
     - name: tenant.unlinked.0
       description: "A workspace was unlinked from a user"
+
+---
+apiVersion: data-core.flowcore.io/v1
+kind: FlowType
+metadata:
+  name: graphable.graph.0
+  tenant: graphable
+spec:
+  dataCore: graphable
+  description: "Graphable graph lifecycle events"
+  eventTypes:
+    - name: graph.created.0
+      description: "Graph fragment was created"
+    - name: graph.updated.0
+      description: "Graph fragment was updated"
+    - name: graph.deleted.0
+      description: "Graph fragment was deleted"
+
+---
+apiVersion: data-core.flowcore.io/v1
+kind: FlowType
+metadata:
+  name: graphable.dashboard.0
+  tenant: graphable
+spec:
+  dataCore: graphable
+  description: "Graphable dashboard lifecycle events"
+  eventTypes:
+    - name: dashboard.created.0
+      description: "Dashboard fragment was created"
+    - name: dashboard.updated.0
+      description: "Dashboard fragment was updated"
+    - name: dashboard.deleted.0
+      description: "Dashboard fragment was deleted"
+
+---
+apiVersion: data-core.flowcore.io/v1
+kind: FlowType
+metadata:
+  name: graphable.folder.0
+  tenant: graphable
+spec:
+  dataCore: graphable
+  description: "Graphable folder lifecycle events"
+  eventTypes:
+    - name: folder.created.0
+      description: "Folder fragment was created"
+    - name: folder.updated.0
+      description: "Folder fragment was updated"
+    - name: folder.deleted.0
+      description: "Folder fragment was deleted"
+
+
+

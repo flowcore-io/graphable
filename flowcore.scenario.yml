@@ -23,3 +23,59 @@ scenario:
           value: graphable-webhook-secret
       blueprint:
         artifactUrl: "https://flowcore-public-runtimes.s3.eu-west-1.amazonaws.com/transformer-proxy-1.4.1.zip"
+    graph:
+      description: "Graphable graph lifecycle transformer"
+      dataCore: graphable
+      flowType: graphable.graph.0
+      shell: flowcoreio/adapter-nodejs-transformer-shell:2.4.1
+      events:
+        - graph.created.0
+        - graph.updated.0
+        - graph.deleted.0
+      parameters:
+        - name: PROXY_ENDPOINT
+          type: manual
+          value: "http://graphable.public-sites:3000/api/transformer"
+        - name: PROXY_HEADER_SECRET
+          type: secret
+          value: graphable-webhook-secret
+      blueprint:
+        artifactUrl: "https://flowcore-public-runtimes.s3.eu-west-1.amazonaws.com/transformer-proxy-1.4.1.zip"
+    dashboard:
+      description: "Graphable dashboard lifecycle transformer"
+      dataCore: graphable
+      flowType: graphable.dashboard.0
+      shell: flowcoreio/adapter-nodejs-transformer-shell:2.4.1
+      events:
+        - dashboard.created.0
+        - dashboard.updated.0
+        - dashboard.deleted.0
+      parameters:
+        - name: PROXY_ENDPOINT
+          type: manual
+          value: "http://graphable.public-sites:3000/api/transformer"
+        - name: PROXY_HEADER_SECRET
+          type: secret
+          value: graphable-webhook-secret
+      blueprint:
+        artifactUrl: "https://flowcore-public-runtimes.s3.eu-west-1.amazonaws.com/transformer-proxy-1.4.1.zip"
+    folder:
+      description: "Graphable folder lifecycle transformer"
+      dataCore: graphable
+      flowType: graphable.folder.0
+      shell: flowcoreio/adapter-nodejs-transformer-shell:2.4.1
+      events:
+        - folder.created.0
+        - folder.updated.0
+        - folder.deleted.0
+      parameters:
+        - name: PROXY_ENDPOINT
+          type: manual
+          value: "http://graphable.public-sites:3000/api/transformer"
+        - name: PROXY_HEADER_SECRET
+          type: secret
+          value: graphable-webhook-secret
+      blueprint:
+        artifactUrl: "https://flowcore-public-runtimes.s3.eu-west-1.amazonaws.com/transformer-proxy-1.4.1.zip"
+
+

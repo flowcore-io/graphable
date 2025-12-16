@@ -61,3 +61,6 @@ docker-compose.yml
 *.log
 *.tsbuildinfo
 next-env.d.ts
+
+
+

@@ -1,3 +1,4 @@
+import { AppShell } from "@/components/app-shell"
 import { Providers } from "@/components/providers"
 import { authOptions } from "@/lib/auth"
 import { getWorkspaceForUser } from "@/lib/services/tenant.service"
@@ -44,7 +45,9 @@ export default async function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className={`${inter.variable} ${geistMono.variable} antialiased`}>
-        <Providers initialWorkspaceId={initialWorkspaceId}>{children}</Providers>
+        <Providers initialWorkspaceId={initialWorkspaceId}>
+          <AppShell>{children}</AppShell>
+        </Providers>
       </body>
     </html>
   )

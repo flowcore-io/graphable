@@ -87,3 +87,6 @@ jobs:
           git add configuration/azure-eu.yaml
           git commit -m "chore(azure-eu): update ${{ needs.extract_info.outputs.tagPath }} to ${{ needs.extract_info.outputs.version }}"
           git push
+
+
+

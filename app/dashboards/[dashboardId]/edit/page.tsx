@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/lib/context/workspace-context"
 import { ArrowLeftIcon } from "lucide-react"
 import Link from "next/link"
@@ -26,6 +27,7 @@ export default function EditDashboardPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
   const [folderId, setFolderId] = useState<string | null | undefined>(undefined)
   const [folders, setFolders] = useState<Folder[]>([])
 
@@ -59,13 +61,19 @@ export default function EditDashboardPage() {
         }
 
         if (dashboardData.dashboard) {
-          // Set title from dashboard data (fallback to "Dashboard" if missing)
+          // Set title and description from dashboard data
           const dashboardTitle = dashboardData.dashboard.title || "Dashboard"
+          const dashboardDescription = dashboardData.dashboard.description || ""
           const dashboardFolderId = dashboardData.dashboard.folderId ?? null
 
-          console.log("Loaded dashboard data:", { title: dashboardTitle, folderId: dashboardFolderId })
+          console.log("Loaded dashboard data:", {
+            title: dashboardTitle,
+            description: dashboardDescription,
+            folderId: dashboardFolderId,
+          })
 
           setTitle(dashboardTitle)
+          setDescription(dashboardDescription)
           setFolderId(dashboardFolderId)
         } else {
           console.error("No dashboard data in response:", dashboardData)
@@ -100,6 +108,7 @@ export default function EditDashboardPage() {
         },
         body: JSON.stringify({
           title: title.trim() || undefined,
+          description: description.trim() || undefined,
           folderId: folderId || null,
         }),
       })
@@ -189,6 +198,17 @@ export default function EditDashboardPage() {
               <div className="space-y-2">
                 <Label htmlFor="title">Dashboard Title</Label>
                 <Input id="title" placeholder="My Dashboard" value={title} onChange={(e) => setTitle(e.target.value)} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description (Optional)</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Describe what this dashboard is for..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                />
               </div>
 
               <div className="space-y-2">

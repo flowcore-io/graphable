@@ -53,6 +53,7 @@ export function DashboardLayout({ dashboard, dashboardId, workspaceId }: Dashboa
           "Content-Type": "application/json",
           "X-Workspace-Id": workspaceId,
         },
+        credentials: "include", // Ensure cookies are sent for authentication
         body: JSON.stringify({
           layout: {
             ...layout,

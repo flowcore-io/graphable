@@ -103,6 +103,7 @@ export function DashboardTable({ folders, dashboards, isLoading }: DashboardTabl
         headers: {
           "X-Workspace-Id": workspaceId,
         },
+        credentials: "include", // Ensure cookies are sent for authentication
       })
 
       if (!response.ok) {
@@ -214,6 +215,12 @@ export function DashboardTable({ folders, dashboards, isLoading }: DashboardTabl
                           <Link href={`/dashboards/${dashboard.id}`} className="flex items-center">
                             <LayoutDashboardIcon className="h-4 w-4 mr-2" />
                             View Dashboard
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/dashboards/${dashboard.id}/edit`} className="flex items-center">
+                            <PencilIcon className="h-4 w-4 mr-2" />
+                            Edit Dashboard
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem

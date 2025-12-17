@@ -13,6 +13,7 @@ export const runtime = "nodejs"
  * Schema for updating a graph
  */
 const updateGraphSchema = z.object({
+  title: z.string().min(1).optional(),
   dataSourceRef: z.string().min(1).optional(),
   connectorRef: z.string().optional(),
   query: z
@@ -199,4 +200,3 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ g
     }
   })(req)
 }
-

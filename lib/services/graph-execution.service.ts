@@ -20,33 +20,61 @@ export async function executeGraph(
     throw new Error(`Graph not found: ${graphId}`)
   }
 
-  // Mock implementation - will be replaced with actual worker service call
-  // Worker service endpoint structure is TBD per plan
+  // Validate parameters against schema
+  const validationResult = validateParameters(graph.parameterSchema, parameters)
+  if (!validationResult.valid) {
+    throw new Error(
+      `Parameter validation failed: ${validationResult.errors?.map((e) => `${e.parameter}: ${e.error}`).join(", ")}`
+    )
+  }
 
-  // Validate parameters
-  // TODO: Get parameter schema from graph fragment
-  // For MVP, we'll skip validation if schema is not available
+  // Apply default values for missing optional parameters
+  const parametersWithDefaults: Record<string, unknown> = { ...parameters }
+  for (const paramDef of graph.parameterSchema.parameters) {
+    if (parametersWithDefaults[paramDef.name] === undefined && paramDef.default !== undefined) {
+      parametersWithDefaults[paramDef.name] = paramDef.default
+    }
+  }
 
-  // Bind parameters to query
-  // TODO: Get query from graph fragment and bind parameters
+  // Bind parameters to query safely
+  const { bindParametersToQuery } = await import("./parameter-validation.service")
+  const boundQuery = bindParametersToQuery(
+    graph.query.text,
+    graph.query.parameters || graph.parameterSchema.parameters,
+    parametersWithDefaults
+  )
 
-  // Call worker service connector API endpoint
-  // TODO: Implement actual worker service call
+  // TODO: Call worker service connector API endpoint
+  // Worker service endpoint structure is TBD per plan (FR6)
   // Example structure (TBD):
-  // const response = await fetch(`${WORKER_SERVICE_URL}/connectors/${connectorRef}/execute`, {
+  // const WORKER_SERVICE_URL = process.env.WORKER_SERVICE_URL || "http://localhost:3001"
+  // const response = await fetch(`${WORKER_SERVICE_URL}/connectors/${graph.connectorRef || graph.dataSourceRef}/execute`, {
   //   method: "POST",
   //   headers: {
   //     "Authorization": `Bearer ${accessToken}`,
   //     "Content-Type": "application/json",
+  //     "X-Workspace-Id": workspaceId,
   //   },
   //   body: JSON.stringify({
   //     query: boundQuery.query,
   //     parameters: boundQuery.parameterValues,
   //     dataSourceRef: graph.dataSourceRef,
+  //     connectorRef: graph.connectorRef,
   //   }),
   // })
+  //
+  // if (!response.ok) {
+  //   const errorData = await response.json()
+  //   throw new Error(errorData.error || "Failed to execute query")
+  // }
+  //
+  // const result = await response.json()
+  // return {
+  //   data: result.data || [],
+  //   columns: result.columns || [],
+  // }
 
-  // Mock response for MVP
+  // Mock response for MVP until worker service is ready
   return {
     data: [],
     columns: [],
@@ -69,6 +97,7 @@ export async function executeDashboard(
     position: { x: number; y: number; w: number; h: number }
     data: unknown[] | null
     columns: string[]
+    error?: string
   }>
 }> {
   // Get dashboard fragment from Usable (dashboardId is the fragment ID)
@@ -78,22 +107,56 @@ export async function executeDashboard(
   }
 
   // Execute all graphs in dashboard
-  // TODO: Implement actual execution
-  // For each tile in dashboard.layout.tiles:
-  //   1. Merge globalParameters with tile.parameterOverrides
-  //   2. Call executeGraph for tile.graphRef
-  //   3. Collect results
+  const tileResults = await Promise.allSettled(
+    dashboard.layout.tiles.map(async (tile) => {
+      // Merge globalParameters with tile.parameterOverrides
+      const mergedParameters = {
+        ...globalParameters,
+        ...tile.parameterOverrides,
+      }
 
-  // Mock response for MVP
+      try {
+        // Call executeGraph for tile.graphRef
+        const result = await executeGraph(workspaceId, tile.graphRef, mergedParameters, accessToken)
+
+        return {
+          graphRef: tile.graphRef,
+          position: tile.position,
+          data: result.data,
+          columns: result.columns,
+        }
+      } catch (error) {
+        // Return error for this tile, but continue with others
+        return {
+          graphRef: tile.graphRef,
+          position: tile.position,
+          data: null,
+          columns: [],
+          error: error instanceof Error ? error.message : "Failed to execute graph",
+        }
+      }
+    })
+  )
+
+  // Process results (handle both fulfilled and rejected promises)
+  const tiles = tileResults.map((result) => {
+    if (result.status === "fulfilled") {
+      return result.value
+    } else {
+      // This shouldn't happen since we catch errors in executeGraph, but handle it anyway
+      return {
+        graphRef: "",
+        position: { x: 0, y: 0, w: 1, h: 1 },
+        data: null,
+        columns: [],
+        error: result.reason instanceof Error ? result.reason.message : "Unknown error",
+      }
+    }
+  })
+
   return {
-    dashboard: {
-      id: "00000000000000000000000000", // Mock ID for development
-      layout: {
-        grid: { columns: 12, rows: 8 },
-        tiles: [],
-      },
-    },
-    tiles: [],
+    dashboard,
+    tiles,
   }
 }
 

@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/lib/context/workspace-context"
 import { ArrowLeftIcon } from "lucide-react"
 import Link from "next/link"
@@ -24,6 +25,7 @@ export default function NewDashboardPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
   const [folderId, setFolderId] = useState<string | null | undefined>(undefined)
   const [folders, setFolders] = useState<Folder[]>([])
 
@@ -74,6 +76,7 @@ export default function NewDashboardPage() {
         },
         body: JSON.stringify({
           title: title || undefined,
+          description: description.trim() || undefined,
           folderId: folderId || undefined,
           layout: {
             grid: {
@@ -163,6 +166,18 @@ export default function NewDashboardPage() {
                 <Label htmlFor="title">Dashboard Title (Optional)</Label>
                 <Input id="title" placeholder="My Dashboard" value={title} onChange={(e) => setTitle(e.target.value)} />
                 <p className="text-xs text-muted-foreground">You can add graphs to this dashboard after creation</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description (Optional)</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Describe what this dashboard is for..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">Optional description for this dashboard</p>
               </div>
 
               <div className="space-y-2">

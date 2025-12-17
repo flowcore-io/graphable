@@ -12,6 +12,7 @@ const GRAPHABLE_APP_TAG = "app:graphable"
  */
 export interface GraphFragmentData {
   id: string // Sortable UUID (ULID) for the fragment
+  title: string // Graph title/name
   dataSourceRef: string
   connectorRef?: string
   query: {
@@ -49,6 +50,7 @@ export interface ParameterDefinition {
  * Graph creation input
  */
 export interface CreateGraphInput {
+  title: string // Graph title/name
   dataSourceRef: string
   connectorRef?: string
   query: {
@@ -95,17 +97,22 @@ export async function createGraph(
   // Create fragment content with ULID
   const fragmentContent: GraphFragmentData = {
     id: fragmentContentUlid,
+    title: graphData.title,
     ...graphData,
   }
+
+  // Generate deterministic key for lookup (format: graph:<ulid>)
+  const fragmentKey = `graph:${fragmentContentUlid}`
 
   // Create fragment in Usable
   const fragment = await usableApi.createFragment(
     workspaceId,
     {
       workspaceId,
-      title: `Graph: ${graphData.dataSourceRef}`,
+      title: graphData.title,
+      key: fragmentKey,
       content: JSON.stringify(fragmentContent, null, 2),
-      summary: `Graph definition for data source ${graphData.dataSourceRef}`,
+      summary: `Graph: ${graphData.title}`,
       tags: [GRAPHABLE_APP_TAG, "type:graph", `version:${GRAPHABLE_VERSION}`, `workspace:${workspaceId}`],
       fragmentTypeId,
       repository: "graphable",
@@ -157,23 +164,25 @@ export async function updateGraph(
 
   const existingData: GraphFragmentData = JSON.parse(fragment.content || "{}")
 
-  // Merge updates, preserving the ID
+  // Full content replacement: merge updates, preserving the ID
   const updatedData: GraphFragmentData = {
     ...existingData,
     ...graphData,
     id: existingData.id, // Preserve the existing ID
+    title: graphData.title !== undefined ? graphData.title : existingData.title, // Update title if provided
     query: graphData.query || existingData.query,
     parameterSchema: graphData.parameterSchema || existingData.parameterSchema,
     visualization: graphData.visualization || existingData.visualization,
   }
 
-  // Update fragment in Usable
+  // Update fragment in Usable using full content replacement
   await usableApi.updateFragment(
     workspaceId,
     graphId, // Fragment ID
     {
-      content: JSON.stringify(updatedData, null, 2),
-      summary: `Graph definition for data source ${updatedData.dataSourceRef}`,
+      title: updatedData.title, // Update fragment title
+      content: JSON.stringify(updatedData, null, 2), // Full content replacement
+      summary: `Graph: ${updatedData.title}`,
     },
     accessToken
   )
@@ -240,6 +249,13 @@ export async function deleteGraph(
 }
 
 /**
+ * Graph with metadata (for display)
+ */
+export interface GraphWithMetadata extends GraphFragmentData {
+  fragmentId: string
+}
+
+/**
  * Get graph fragment from Usable API
  * Read function - no SessionPathway needed
  */
@@ -247,48 +263,94 @@ export async function getGraph(
   workspaceId: string,
   graphId: string, // Fragment ID
   accessToken: string
-): Promise<GraphFragmentData | null> {
+): Promise<GraphWithMetadata | null> {
   // Get fragment directly from Usable (graphId is the fragment ID)
   const fragment = await usableApi.getFragment(workspaceId, graphId, accessToken)
   if (!fragment) {
     return null
   }
 
-  return JSON.parse(fragment.content || "{}") as GraphFragmentData
+  const parsed = JSON.parse(fragment.content || "{}") as Partial<GraphFragmentData>
+
+  return {
+    ...(parsed as GraphFragmentData),
+    title: parsed.title || fragment.title || "Untitled Graph", // Fallback to fragment title or default
+    fragmentId: fragment.id,
+  }
+}
+
+/**
+ * Graph list item with metadata
+ */
+export interface GraphListItem {
+  id: string // Fragment ID
+  fragmentId: string
+  title: string
+  dataSourceRef: string
+  visualizationType: "line" | "bar" | "table" | "pie" | "scatter" | "area"
+  parameterCount: number
 }
 
 /**
  * List graphs for a workspace
  * Read function - no SessionPathway needed
+ * Query Usable fragments directly (no cache)
  */
-export async function listGraphs(
-  workspaceId: string,
-  accessToken: string
-): Promise<Array<{ id: string; fragmentId: string; dataSourceRef: string }>> {
-  // List fragments by type and tags
+export async function listGraphs(workspaceId: string, accessToken: string): Promise<GraphListItem[]> {
+  // Get fragment type ID for "graphs" to ensure proper filtering
+  const fragmentTypeId = await usableApi.getFragmentTypeIdByName(workspaceId, "graphs", accessToken)
+
+  // If fragment type doesn't exist, return empty array (workspace not bootstrapped)
+  if (!fragmentTypeId) {
+    console.warn("Fragment type 'graphs' not found. Workspace may not be bootstrapped.")
+    return []
+  }
+
+  // List fragments by fragmentTypeId AND tags (double filtering for safety)
   const fragments = await usableApi.listFragments(
     workspaceId,
     {
+      fragmentTypeId, // Required - ensures strict filtering by fragment type
       tags: [GRAPHABLE_APP_TAG, "type:graph"],
       limit: 100,
     },
     accessToken
   )
 
-  // Parse dataSourceRef from fragment content (no cache needed)
-  return fragments.map((fragment) => {
+  // Defensive validation: Filter out any fragments that don't match the expected fragment type
+  // This ensures we never accidentally return fragments of the wrong type
+  const validFragments = fragments.filter((fragment) => fragment.fragmentTypeId === fragmentTypeId)
+
+  if (validFragments.length !== fragments.length) {
+    console.warn(
+      `Filtered out ${fragments.length - validFragments.length} fragments with incorrect fragment type. Expected: ${fragmentTypeId}`
+    )
+  }
+
+  // Parse metadata from fragment content (no cache needed)
+  return validFragments.map((fragment) => {
+    let title = fragment.title || "Untitled Graph" // Fallback to fragment title or default
     let dataSourceRef = "unknown"
+    let visualizationType: "line" | "bar" | "table" | "pie" | "scatter" | "area" = "table"
+    let parameterCount = 0
+
     try {
       const content = JSON.parse(fragment.content || "{}") as Partial<GraphFragmentData>
+      title = content.title || fragment.title || "Untitled Graph"
       dataSourceRef = content.dataSourceRef || "unknown"
+      visualizationType = content.visualization?.type || "table"
+      parameterCount = content.parameterSchema?.parameters?.length || 0
     } catch {
-      // If parsing fails, use default
+      // If parsing fails, use defaults
     }
 
     return {
       id: fragment.id, // Fragment ID is the graph ID
       fragmentId: fragment.id,
+      title,
       dataSourceRef,
+      visualizationType,
+      parameterCount,
     }
   })
 }

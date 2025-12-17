@@ -14,6 +14,7 @@ export const runtime = "nodejs"
  * Schema for creating a graph
  */
 const createGraphSchema = z.object({
+  title: z.string().min(1, "Title is required"),
   dataSourceRef: z.string().min(1, "Data source reference is required"),
   connectorRef: z.string().optional(),
   query: z.object({
@@ -123,4 +124,3 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) =
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 })
-

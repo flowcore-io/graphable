@@ -210,13 +210,14 @@ export class UsableApiService {
     // The API returns this format for async fragment creation
     if (typeof response === "object" && response !== null && "fragmentId" in response) {
       const asyncResponse = response as { fragmentId: string; status: string; message?: string }
-      // Return a minimal fragment object immediately - don't try to fetch since it's async
-      // The fragment will be available later, but we have the fragmentId we need
+      // For async creation, include the content we sent since we have it
+      // The fragment will be persisted asynchronously, but we return the full fragment object
       return {
         id: asyncResponse.fragmentId,
         workspaceId,
         title: fragment.title,
         summary: fragment.summary,
+        content: fragment.content, // Include content from input
         fragmentTypeId: fragment.fragmentTypeId,
         status: "draft" as const, // Default to draft for async fragments
         tags: fragment.tags || [],
@@ -239,13 +240,31 @@ export class UsableApiService {
    * Get a memory fragment by ID
    */
   async getFragment(workspaceId: string, fragmentId: string, accessToken: string): Promise<UsableFragment> {
-    return this.request<UsableFragment>(`/memory-fragments/${fragmentId}`, {
+    const response = await this.request<unknown>(`/memory-fragments/${fragmentId}`, {
       method: "GET",
       accessToken,
       headers: {
         "X-Workspace-Id": workspaceId,
       },
     })
+
+    // Handle different response formats
+    // Format 1: { success: boolean, fragment: UsableFragment }
+    if (typeof response === "object" && response !== null && "fragment" in response) {
+      const wrapped = response as { fragment: UsableFragment }
+      if (wrapped.fragment && typeof wrapped.fragment === "object" && "id" in wrapped.fragment) {
+        return wrapped.fragment
+      }
+    }
+
+    // Format 2: Direct UsableFragment object
+    if (typeof response === "object" && response !== null && "id" in response) {
+      return response as UsableFragment
+    }
+
+    // If we get here, the response format is unexpected
+    console.error("Unexpected getFragment response format:", JSON.stringify(response, null, 2))
+    throw new Error(`Unexpected response format from getFragment API: ${JSON.stringify(response)}`)
   }
 
   /**

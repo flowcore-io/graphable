@@ -42,7 +42,10 @@ export interface RequireWorkspaceOptions {
  * ```
  */
 export function requireWorkspace<T = any>(
-  handler: (req: NextRequest, context: { workspaceId: string; userId: string }) => Promise<NextResponse<T>>,
+  handler: (
+    req: NextRequest,
+    context: { workspaceId: string; userId: string; accessToken: string }
+  ) => Promise<NextResponse<T>>,
   options: RequireWorkspaceOptions = {}
 ) {
   return async (req: NextRequest): Promise<NextResponse<T> | NextResponse<{ error: string }>> => {
@@ -53,7 +56,13 @@ export function requireWorkspace<T = any>(
         return NextResponse.json({ error: "Authentication required" }, { status: 401 })
       }
 
+      // Check for accessToken - required for Usable API calls
+      if (!session.user.accessToken) {
+        return NextResponse.json({ error: "Authentication token missing" }, { status: 401 })
+      }
+
       const userId = session.user.id
+      const accessToken = session.user.accessToken
       const source = options.source || "header"
 
       // Layer 2 - Extract and validate workspace ID format
@@ -103,6 +112,7 @@ export function requireWorkspace<T = any>(
       return handler(req, {
         workspaceId: validatedWorkspaceId,
         userId,
+        accessToken,
       })
     } catch (error) {
       console.error("Workspace guard error:", error)
@@ -110,6 +120,3 @@ export function requireWorkspace<T = any>(
     }
   }
 }
-
-
-

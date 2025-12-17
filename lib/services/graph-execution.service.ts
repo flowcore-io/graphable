@@ -82,6 +82,51 @@ export async function executeGraph(
 }
 
 /**
+ * Execute a query directly without a saved graph (for preview)
+ * Returns result data for visualization
+ */
+export async function executeQuery(
+  workspaceId: string,
+  graphData: {
+    query: {
+      dialect: "sql"
+      text: string
+      parameters: Array<{
+        name: string
+        type: string
+        required: boolean
+        default?: unknown
+      }>
+    }
+    dataSourceRef: string
+    connectorRef?: string
+  },
+  parameters: Record<string, unknown>,
+  accessToken: string
+): Promise<{ data: unknown[]; columns: string[] }> {
+  // Apply default values for missing optional parameters
+  const parametersWithDefaults: Record<string, unknown> = { ...parameters }
+  for (const paramDef of graphData.query.parameters) {
+    if (parametersWithDefaults[paramDef.name] === undefined && paramDef.default !== undefined) {
+      parametersWithDefaults[paramDef.name] = paramDef.default
+    }
+  }
+
+  // Bind parameters to query safely
+  const { bindParametersToQuery } = await import("./parameter-validation.service")
+  const boundQuery = bindParametersToQuery(graphData.query.text, graphData.query.parameters, parametersWithDefaults)
+
+  // TODO: Call worker service connector API endpoint
+  // Worker service endpoint structure is TBD per plan (FR6)
+  // For now, return mock response
+  // Mock response for MVP until worker service is ready
+  return {
+    data: [],
+    columns: [],
+  }
+}
+
+/**
  * Execute all graphs in a dashboard
  * Returns rendered dashboard data
  */

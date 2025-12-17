@@ -1,6 +1,7 @@
 import type { SessionPathwayBuilder } from "@flowcore/pathways"
 import { randomUUID } from "crypto"
 import { ulid } from "ulid"
+import { z } from "zod"
 import * as folderContract from "../pathways/contracts/folder.0"
 import { usableApi } from "./usable-api.service"
 
@@ -8,30 +9,51 @@ const GRAPHABLE_VERSION = "0.2.0"
 const GRAPHABLE_APP_TAG = "app:graphable"
 
 /**
+ * Zod schema for folder fragment content (stored in Usable fragment.content)
+ *
+ * ARCHITECTURAL NOTE:
+ * - All configuration data MUST be in the JSON content (fragment.content)
+ * - fragment.title, fragment.summary, and fragment frontmatter are for Usable convenience and AI search
+ * - These metadata fields should be synced from the JSON content for consistency
+ * - The JSON content is the source of truth for all configuration
+ */
+export const folderFragmentDataSchema = z.object({
+  id: z.string().min(1, "ID is required"), // Sortable UUID (ULID) for the fragment
+  name: z.string().min(1, "Name is required"), // Name is stored in JSON content (source of truth)
+  parentFolderId: z.string().uuid("Parent folder ID must be a valid UUID").optional(), // Fragment ID of parent folder (if any)
+})
+
+/**
  * Folder fragment structure (stored in Usable)
  * Fragment ID is used as the folder ID (no separate UUID)
  */
-export interface FolderFragmentData {
-  id: string // Sortable UUID (ULID) for the fragment
-  name: string
-  parentFolderId?: string // Fragment ID of parent folder (if any)
-}
+export type FolderFragmentData = z.infer<typeof folderFragmentDataSchema>
+
+/**
+ * Zod schema for creating a folder
+ */
+export const createFolderInputSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  parentFolderId: z.string().uuid("Parent folder ID must be a valid UUID").optional(),
+})
 
 /**
  * Folder creation input
  */
-export interface CreateFolderInput {
-  name: string
-  parentFolderId?: string
-}
+export type CreateFolderInput = z.infer<typeof createFolderInputSchema>
+
+/**
+ * Zod schema for updating a folder
+ */
+export const updateFolderInputSchema = z.object({
+  name: z.string().min(1).optional(),
+  parentFolderId: z.string().uuid("Parent folder ID must be a valid UUID").optional(),
+})
 
 /**
  * Folder update input
  */
-export interface UpdateFolderInput {
-  name?: string
-  parentFolderId?: string
-}
+export type UpdateFolderInput = z.infer<typeof updateFolderInputSchema>
 
 /**
  * Folder with metadata (for display)
@@ -79,21 +101,29 @@ export async function createFolder(
   // Generate sortable UUID for the fragment content
   const fragmentUlid = ulid()
 
+  // Validate input data
+  const validatedData = createFolderInputSchema.parse(folderData)
+
   // Create fragment content with ULID
+  // Name is stored in JSON content (source of truth)
   const fragmentContent: FolderFragmentData = {
     id: fragmentUlid,
-    name: folderData.name,
-    parentFolderId: folderData.parentFolderId, // Fragment ID of parent folder
+    name: validatedData.name, // Name is in JSON content (source of truth)
+    parentFolderId: validatedData.parentFolderId, // Fragment ID of parent folder
   }
 
+  // Validate the content structure
+  const validatedContent = folderFragmentDataSchema.parse(fragmentContent)
+
   // Create fragment in Usable
+  // Sync name to fragment.title for Usable search convenience (content.name is source of truth)
   const fragment = await usableApi.createFragment(
     workspaceId,
     {
       workspaceId,
-      title: folderData.name,
-      content: JSON.stringify(fragmentContent, null, 2),
-      summary: `Folder: ${folderData.name}`,
+      title: validatedContent.name, // Sync from content for search
+      content: JSON.stringify(validatedContent, null, 2),
+      summary: `Folder: ${validatedContent.name}`,
       tags: [GRAPHABLE_APP_TAG, "type:folder", `version:${GRAPHABLE_VERSION}`],
       fragmentTypeId,
       repository: "graphable",
@@ -147,24 +177,40 @@ export async function updateFolder(
     throw new Error(`Folder not found: ${folderId}`)
   }
 
-  const existingData: FolderFragmentData = JSON.parse(fragment.content || "{}")
-
-  // Merge updates, preserving the ID
-  const updatedData: FolderFragmentData = {
-    ...existingData,
-    name: folderData.name !== undefined ? folderData.name : existingData.name,
-    parentFolderId: folderData.parentFolderId !== undefined ? folderData.parentFolderId : existingData.parentFolderId,
-    id: existingData.id, // Preserve the existing ID
+  // Validate and parse existing fragment content
+  let existingData: FolderFragmentData
+  try {
+    const parsed = JSON.parse(fragment.content || "{}")
+    existingData = folderFragmentDataSchema.parse(parsed)
+  } catch (error) {
+    console.error("Failed to parse existing folder fragment content:", error)
+    throw new Error(`Invalid folder fragment content: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 
+  // Validate update input
+  const validatedUpdate = updateFolderInputSchema.parse(folderData)
+
+  // Merge updates, preserving the ID
+  // Name is stored in JSON content (source of truth)
+  const updatedData: FolderFragmentData = {
+    id: existingData.id, // Preserve the existing ID
+    name: validatedUpdate.name !== undefined ? validatedUpdate.name : existingData.name, // Name from content
+    parentFolderId:
+      validatedUpdate.parentFolderId !== undefined ? validatedUpdate.parentFolderId : existingData.parentFolderId,
+  }
+
+  // Validate the merged data
+  const validatedUpdatedData = folderFragmentDataSchema.parse(updatedData)
+
   // Update fragment in Usable
+  // Sync name to fragment.title for Usable search convenience (content.name is source of truth)
   await usableApi.updateFragment(
     workspaceId,
     folderId, // Fragment ID
     {
-      content: JSON.stringify(updatedData, null, 2),
-      title: updatedData.name,
-      summary: `Folder: ${updatedData.name}`,
+      content: JSON.stringify(validatedUpdatedData, null, 2),
+      title: validatedUpdatedData.name, // Sync from content for search
+      summary: `Folder: ${validatedUpdatedData.name}`,
     },
     accessToken
   )
@@ -177,8 +223,8 @@ export async function updateFolder(
         folderId, // Fragment ID
         fragmentId: folderId, // Same as folderId
         workspaceId,
-        name: updatedData.name,
-        parentFolderId: updatedData.parentFolderId,
+        name: validatedUpdatedData.name,
+        parentFolderId: validatedUpdatedData.parentFolderId,
         occurredAt: new Date().toISOString(),
         initiatedBy: (sessionPathway as any).getUserResolver
           ? (await (sessionPathway as any).getUserResolver()).entityId
@@ -245,10 +291,18 @@ export async function getFolder(
     return null
   }
 
-  const parsed = JSON.parse((fragment as any).content || "{}") as Partial<FolderFragmentData>
+  // Validate and parse fragment content
+  let parsed: FolderFragmentData
+  try {
+    const jsonParsed = JSON.parse(fragment.content || "{}")
+    parsed = folderFragmentDataSchema.parse(jsonParsed)
+  } catch (error) {
+    console.error("Failed to parse folder fragment content:", error)
+    throw new Error(`Invalid folder fragment content: ${error instanceof Error ? error.message : "Unknown error"}`)
+  }
 
   return {
-    ...(parsed as FolderFragmentData),
+    ...parsed,
     title: fragment.title,
     summary: fragment.summary,
     fragmentId: fragment.id,
@@ -296,11 +350,13 @@ export async function listFolders(workspaceId: string, accessToken: string): Pro
     let name = fragment.title // Fallback to title
     let parentFolderId: string | null | undefined
     try {
-      const content = JSON.parse(fragment.content || "{}") as Partial<FolderFragmentData>
+      const jsonParsed = JSON.parse(fragment.content || "{}")
+      const content = folderFragmentDataSchema.parse(jsonParsed)
       name = content.name || fragment.title
       parentFolderId = content.parentFolderId || null
-    } catch {
-      // If parsing fails, use defaults
+    } catch (error) {
+      // If parsing/validation fails, use defaults and log warning
+      console.warn(`Failed to parse folder fragment ${fragment.id}:`, error)
     }
 
     return {

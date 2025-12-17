@@ -6,6 +6,12 @@ import {
   handlerDashboardDeleted,
   handlerDashboardUpdated,
 } from "./contracts/dashboard.0.handlers"
+import * as datasourceContract from "./contracts/datasource.0"
+import {
+  handlerDataSourceCreated,
+  handlerDataSourceDeleted,
+  handlerDataSourceUpdated,
+} from "./contracts/datasource.0.handlers"
 import * as folderContract from "./contracts/folder.0"
 import { handlerFolderCreated, handlerFolderDeleted, handlerFolderUpdated } from "./contracts/folder.0.handlers"
 import * as graphContract from "./contracts/graph.0"
@@ -109,6 +115,27 @@ export const pathways = new PathwaysBuilder({
     schema: folderContract.EventFolderDeletedSchema as any,
     writable: true,
   })
+  // Register datasource.created.0 event
+  .register({
+    flowType: datasourceContract.FlowcoreDataSource.flowType,
+    eventType: datasourceContract.FlowcoreDataSource.eventType.created,
+    schema: datasourceContract.EventDataSourceCreatedSchema as any,
+    writable: true,
+  })
+  // Register datasource.updated.0 event
+  .register({
+    flowType: datasourceContract.FlowcoreDataSource.flowType,
+    eventType: datasourceContract.FlowcoreDataSource.eventType.updated,
+    schema: datasourceContract.EventDataSourceUpdatedSchema as any,
+    writable: true,
+  })
+  // Register datasource.deleted.0 event
+  .register({
+    flowType: datasourceContract.FlowcoreDataSource.flowType,
+    eventType: datasourceContract.FlowcoreDataSource.eventType.deleted,
+    schema: datasourceContract.EventDataSourceDeletedSchema as any,
+    writable: true,
+  })
 
 // Register handlers AFTER all registrations
 pathways.handle(
@@ -164,6 +191,21 @@ pathways.handle(
 pathways.handle(
   `${folderContract.FlowcoreFolder.flowType}/${folderContract.FlowcoreFolder.eventType.deleted}`,
   handlerFolderDeleted as any
+)
+
+pathways.handle(
+  `${datasourceContract.FlowcoreDataSource.flowType}/${datasourceContract.FlowcoreDataSource.eventType.created}`,
+  handlerDataSourceCreated as any
+)
+
+pathways.handle(
+  `${datasourceContract.FlowcoreDataSource.flowType}/${datasourceContract.FlowcoreDataSource.eventType.updated}`,
+  handlerDataSourceUpdated as any
+)
+
+pathways.handle(
+  `${datasourceContract.FlowcoreDataSource.flowType}/${datasourceContract.FlowcoreDataSource.eventType.deleted}`,
+  handlerDataSourceDeleted as any
 )
 
 // Export router for transformer endpoint

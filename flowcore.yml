@@ -75,5 +75,22 @@ spec:
     - name: folder.deleted.0
       description: "Folder fragment was deleted"
 
+---
+apiVersion: data-core.flowcore.io/v1
+kind: FlowType
+metadata:
+  name: graphable.datasource.0
+  tenant: graphable
+spec:
+  dataCore: graphable
+  description: "Graphable data source lifecycle events"
+  eventTypes:
+    - name: datasource.created.0
+      description: "Data source fragment was created"
+    - name: datasource.updated.0
+      description: "Data source fragment was updated"
+    - name: datasource.deleted.0
+      description: "Data source fragment was deleted"
+
 
 

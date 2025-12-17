@@ -10,12 +10,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { DashboardFragmentData } from "@/lib/services/dashboard.service"
-import { MoreVerticalIcon, PlusIcon, TrashIcon } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { MoreVerticalIcon, TrashIcon } from "lucide-react"
 import { useState } from "react"
 
 interface DashboardLayoutProps {
@@ -29,7 +27,6 @@ interface DashboardLayoutProps {
  * Renders dashboard grid layout with graph tiles and supports CRUD operations
  */
 export function DashboardLayout({ dashboard, dashboardId, workspaceId }: DashboardLayoutProps) {
-  const router = useRouter()
   const [deleteTileIndex, setDeleteTileIndex] = useState<number | null>(null)
   const [isDeletingTile, setIsDeletingTile] = useState(false)
 
@@ -81,25 +78,13 @@ export function DashboardLayout({ dashboard, dashboardId, workspaceId }: Dashboa
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Graphs</h2>
-        <Button variant="outline" onClick={() => router.push(`/dashboards/${dashboardId}/add-graph`)}>
-          <PlusIcon className="h-4 w-4 mr-2" />
-          Add Graph
-        </Button>
       </div>
 
       {layout.tiles.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <p className="text-muted-foreground">No graphs added to this dashboard yet</p>
-            <p className="text-sm text-muted-foreground mt-2">Add graphs to see them displayed here</p>
-            <Button
-              variant="outline"
-              className="mt-4"
-              onClick={() => router.push(`/dashboards/${dashboardId}/add-graph`)}
-            >
-              <PlusIcon className="h-4 w-4 mr-2" />
-              Add Your First Graph
-            </Button>
+            <p className="text-sm text-muted-foreground mt-2">Switch to edit mode to add graphs</p>
           </CardContent>
         </Card>
       ) : (

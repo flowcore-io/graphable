@@ -35,6 +35,13 @@ export const env = createEnv({
     FLOWCORE_WEBHOOK_API_KEY: z.string().min(1),
     FLOWCORE_TRANSFORMER_SECRET: z.string().min(1),
 
+    // Azure Key Vault
+    AZURE_KEY_VAULT_URL: z.string().url().optional(),
+    // Azure authentication (for local dev - Managed Identity used in production)
+    AZURE_CLIENT_ID: z.string().optional(),
+    AZURE_CLIENT_SECRET: z.string().optional(),
+    AZURE_TENANT_ID: z.string().optional(),
+
     // Node Environment
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   },
@@ -73,6 +80,12 @@ export const env = createEnv({
     FLOWCORE_WEBHOOK_API_KEY: process.env.FLOWCORE_WEBHOOK_API_KEY,
     FLOWCORE_TRANSFORMER_SECRET: process.env.FLOWCORE_TRANSFORMER_SECRET,
 
+    // Azure Key Vault
+    AZURE_KEY_VAULT_URL: process.env.AZURE_KEY_VAULT_URL,
+    AZURE_CLIENT_ID: process.env.AZURE_CLIENT_ID,
+    AZURE_CLIENT_SECRET: process.env.AZURE_CLIENT_SECRET,
+    AZURE_TENANT_ID: process.env.AZURE_TENANT_ID,
+
     // Node Environment
     NODE_ENV: process.env.NODE_ENV,
   },
@@ -89,6 +102,3 @@ export const env = createEnv({
    */
   emptyStringAsUndefined: true,
 })
-
-
-

@@ -21,7 +21,9 @@ interface DashboardPageClientProps {
 
 export function DashboardPageClient({ dashboard, dashboardId, workspaceId, workspaceName }: DashboardPageClientProps) {
   const router = useRouter()
-  const [isEditing, setIsEditing] = useState(false)
+  // Auto-enter edit mode if dashboard is empty (no graphs)
+  const isEmpty = !dashboard?.layout?.tiles || dashboard.layout.tiles.length === 0
+  const [isEditing, setIsEditing] = useState(isEmpty)
   const [isSaving, setIsSaving] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState("")
@@ -36,6 +38,14 @@ export function DashboardPageClient({ dashboard, dashboardId, workspaceId, works
     const currentTitle = dashboard?.title?.trim() || workspaceName || "Dashboard"
     setTitleValue(currentTitle)
   }, [dashboard?.title, workspaceName])
+
+  // Auto-enter edit mode if dashboard becomes empty
+  useEffect(() => {
+    const isEmpty = !dashboard?.layout?.tiles || dashboard.layout.tiles.length === 0
+    if (isEmpty && !isEditing) {
+      setIsEditing(true)
+    }
+  }, [dashboard?.layout?.tiles, isEditing])
 
   // Focus input when entering title edit mode
   useEffect(() => {

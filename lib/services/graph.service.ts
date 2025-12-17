@@ -1,6 +1,7 @@
 import type { SessionPathwayBuilder } from "@flowcore/pathways"
 import { randomUUID } from "crypto"
 import { ulid } from "ulid"
+import { z } from "zod"
 import * as graphContract from "../pathways/contracts/graph.0"
 import { usableApi } from "./usable-api.service"
 
@@ -8,72 +9,102 @@ const GRAPHABLE_VERSION = "0.2.0"
 const GRAPHABLE_APP_TAG = "app:graphable"
 
 /**
- * Graph fragment structure (stored in Usable)
+ * Zod schema for parameter definition
  */
-export interface GraphFragmentData {
-  id: string // Sortable UUID (ULID) for the fragment
-  title: string // Graph title/name
-  dataSourceRef: string
-  connectorRef?: string
-  query: {
-    dialect: "sql"
-    text: string
-    parameters: ParameterDefinition[]
-  }
-  parameterSchema: {
-    parameters: ParameterDefinition[]
-  }
-  visualization: {
-    type: "line" | "bar" | "table" | "pie" | "scatter" | "area"
-    options: Record<string, unknown>
-  }
-  cachePolicy?: {
-    ttl?: number
-  }
-}
+const parameterDefinitionSchema = z.object({
+  name: z.string().min(1, "Parameter name is required"),
+  type: z.enum(["string", "number", "boolean", "date", "timestamp", "enum", "string[]", "number[]"]),
+  required: z.boolean(),
+  default: z.unknown().optional(),
+  enumValues: z.array(z.string()).optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  pattern: z.string().optional(),
+})
 
 /**
  * Parameter definition for graphs
  */
-export interface ParameterDefinition {
-  name: string
-  type: "string" | "number" | "boolean" | "date" | "timestamp" | "enum" | "string[]" | "number[]"
-  required: boolean
-  default?: unknown
-  enumValues?: string[]
-  min?: number
-  max?: number
-  pattern?: string
-}
+export type ParameterDefinition = z.infer<typeof parameterDefinitionSchema>
+
+/**
+ * Zod schema for graph fragment content (stored in Usable fragment.content)
+ *
+ * ARCHITECTURAL NOTE:
+ * - All configuration data MUST be in the JSON content (fragment.content)
+ * - fragment.title, fragment.summary, and fragment frontmatter are for Usable convenience and AI search
+ * - These metadata fields should be synced from the JSON content for consistency
+ * - The JSON content is the source of truth for all configuration
+ */
+export const graphFragmentDataSchema = z.object({
+  id: z.string().min(1, "ID is required"), // Sortable UUID (ULID) for the fragment
+  title: z.string().min(1, "Title is required"), // Graph title/name - stored in JSON content (source of truth)
+  dataSourceRef: z.string().min(1, "Data source reference is required"),
+  connectorRef: z.string().optional(),
+  query: z.object({
+    dialect: z.literal("sql"),
+    text: z.string().min(1, "Query text is required"),
+    parameters: z.array(parameterDefinitionSchema),
+  }),
+  parameterSchema: z.object({
+    parameters: z.array(parameterDefinitionSchema),
+  }),
+  visualization: z.object({
+    type: z.enum(["line", "bar", "table", "pie", "scatter", "area"]),
+    options: z.record(z.unknown()),
+  }),
+  cachePolicy: z
+    .object({
+      ttl: z.number().int().positive().optional(),
+    })
+    .optional(),
+})
+
+/**
+ * Graph fragment structure (stored in Usable)
+ */
+export type GraphFragmentData = z.infer<typeof graphFragmentDataSchema>
+
+/**
+ * Zod schema for creating a graph
+ */
+export const createGraphInputSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  dataSourceRef: z.string().min(1, "Data source reference is required"),
+  connectorRef: z.string().optional(),
+  query: z.object({
+    dialect: z.literal("sql"),
+    text: z.string().min(1, "Query text is required"),
+    parameters: z.array(parameterDefinitionSchema),
+  }),
+  parameterSchema: z.object({
+    parameters: z.array(parameterDefinitionSchema),
+  }),
+  visualization: z.object({
+    type: z.enum(["line", "bar", "table", "pie", "scatter", "area"]),
+    options: z.record(z.unknown()),
+  }),
+  cachePolicy: z
+    .object({
+      ttl: z.number().int().positive().optional(),
+    })
+    .optional(),
+})
 
 /**
  * Graph creation input
  */
-export interface CreateGraphInput {
-  title: string // Graph title/name
-  dataSourceRef: string
-  connectorRef?: string
-  query: {
-    dialect: "sql"
-    text: string
-    parameters: ParameterDefinition[]
-  }
-  parameterSchema: {
-    parameters: ParameterDefinition[]
-  }
-  visualization: {
-    type: "line" | "bar" | "table" | "pie" | "scatter" | "area"
-    options: Record<string, unknown>
-  }
-  cachePolicy?: {
-    ttl?: number
-  }
-}
+export type CreateGraphInput = z.infer<typeof createGraphInputSchema>
+
+/**
+ * Zod schema for updating a graph
+ */
+export const updateGraphInputSchema = createGraphInputSchema.partial()
 
 /**
  * Graph update input
  */
-export interface UpdateGraphInput extends Partial<CreateGraphInput> {}
+export type UpdateGraphInput = z.infer<typeof updateGraphInputSchema>
 
 /**
  * Create a graph fragment and emit graph.created.0 event
@@ -94,25 +125,38 @@ export async function createGraph(
   // Generate sortable UUID for the fragment content
   const fragmentContentUlid = ulid()
 
+  // Validate input data
+  const validatedData = createGraphInputSchema.parse(graphData)
+
   // Create fragment content with ULID
+  // Title is stored in JSON content (source of truth)
   const fragmentContent: GraphFragmentData = {
     id: fragmentContentUlid,
-    title: graphData.title,
-    ...graphData,
+    title: validatedData.title, // Title is in JSON content (source of truth)
+    dataSourceRef: validatedData.dataSourceRef,
+    connectorRef: validatedData.connectorRef,
+    query: validatedData.query,
+    parameterSchema: validatedData.parameterSchema,
+    visualization: validatedData.visualization,
+    cachePolicy: validatedData.cachePolicy,
   }
+
+  // Validate the content structure
+  const validatedContent = graphFragmentDataSchema.parse(fragmentContent)
 
   // Generate deterministic key for lookup (format: graph:<ulid>)
   const fragmentKey = `graph:${fragmentContentUlid}`
 
   // Create fragment in Usable
+  // Sync title to fragment.title for Usable search convenience (content.title is source of truth)
   const fragment = await usableApi.createFragment(
     workspaceId,
     {
       workspaceId,
-      title: graphData.title,
+      title: validatedContent.title, // Sync from content for search
       key: fragmentKey,
-      content: JSON.stringify(fragmentContent, null, 2),
-      summary: `Graph: ${graphData.title}`,
+      content: JSON.stringify(validatedContent, null, 2),
+      summary: `Graph: ${validatedContent.title}`,
       tags: [GRAPHABLE_APP_TAG, "type:graph", `version:${GRAPHABLE_VERSION}`, `workspace:${workspaceId}`],
       fragmentTypeId,
       repository: "graphable",
@@ -131,8 +175,8 @@ export async function createGraph(
         graphId, // Fragment ID
         fragmentId: graphId, // Same as graphId
         workspaceId,
-        dataSourceRef: graphData.dataSourceRef,
-        connectorRef: graphData.connectorRef,
+        dataSourceRef: validatedData.dataSourceRef,
+        connectorRef: validatedData.connectorRef,
         occurredAt: new Date().toISOString(),
         initiatedBy: (sessionPathway as any).getUserResolver
           ? (await (sessionPathway as any).getUserResolver()).entityId
@@ -162,20 +206,38 @@ export async function updateGraph(
     throw new Error(`Graph not found: ${graphId}`)
   }
 
-  const existingData: GraphFragmentData = JSON.parse(fragment.content || "{}")
-
-  // Full content replacement: merge updates, preserving the ID
-  const updatedData: GraphFragmentData = {
-    ...existingData,
-    ...graphData,
-    id: existingData.id, // Preserve the existing ID
-    title: graphData.title !== undefined ? graphData.title : existingData.title, // Update title if provided
-    query: graphData.query || existingData.query,
-    parameterSchema: graphData.parameterSchema || existingData.parameterSchema,
-    visualization: graphData.visualization || existingData.visualization,
+  // Validate and parse existing fragment content
+  let existingData: GraphFragmentData
+  try {
+    const parsed = JSON.parse(fragment.content || "{}")
+    existingData = graphFragmentDataSchema.parse(parsed)
+  } catch (error) {
+    console.error("Failed to parse existing graph fragment content:", error)
+    throw new Error(`Invalid graph fragment content: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 
+  // Validate update input
+  const validatedUpdate = updateGraphInputSchema.parse(graphData)
+
+  // Full content replacement: merge updates, preserving the ID
+  // Title is stored in JSON content (source of truth)
+  const updatedData: GraphFragmentData = {
+    id: existingData.id, // Preserve the existing ID
+    title: validatedUpdate.title !== undefined ? validatedUpdate.title : existingData.title, // Title from content
+    dataSourceRef:
+      validatedUpdate.dataSourceRef !== undefined ? validatedUpdate.dataSourceRef : existingData.dataSourceRef,
+    connectorRef: validatedUpdate.connectorRef !== undefined ? validatedUpdate.connectorRef : existingData.connectorRef,
+    query: validatedUpdate.query || existingData.query,
+    parameterSchema: validatedUpdate.parameterSchema || existingData.parameterSchema,
+    visualization: validatedUpdate.visualization || existingData.visualization,
+    cachePolicy: validatedUpdate.cachePolicy !== undefined ? validatedUpdate.cachePolicy : existingData.cachePolicy,
+  }
+
+  // Validate the merged data
+  const validatedUpdatedData = graphFragmentDataSchema.parse(updatedData)
+
   // Update fragment in Usable using full content replacement
+  // Sync title to fragment.title for Usable search convenience (content.title is source of truth)
   await usableApi.updateFragment(
     workspaceId,
     graphId, // Fragment ID
@@ -195,8 +257,8 @@ export async function updateGraph(
         graphId, // Fragment ID
         fragmentId: graphId, // Same as graphId
         workspaceId,
-        dataSourceRef: updatedData.dataSourceRef,
-        connectorRef: updatedData.connectorRef,
+        dataSourceRef: validatedUpdatedData.dataSourceRef,
+        connectorRef: validatedUpdatedData.connectorRef,
         occurredAt: new Date().toISOString(),
         initiatedBy: (sessionPathway as any).getUserResolver
           ? (await (sessionPathway as any).getUserResolver()).entityId
@@ -270,10 +332,18 @@ export async function getGraph(
     return null
   }
 
-  const parsed = JSON.parse(fragment.content || "{}") as Partial<GraphFragmentData>
+  // Validate and parse fragment content
+  let parsed: GraphFragmentData
+  try {
+    const jsonParsed = JSON.parse(fragment.content || "{}")
+    parsed = graphFragmentDataSchema.parse(jsonParsed)
+  } catch (error) {
+    console.error("Failed to parse graph fragment content:", error)
+    throw new Error(`Invalid graph fragment content: ${error instanceof Error ? error.message : "Unknown error"}`)
+  }
 
   return {
-    ...(parsed as GraphFragmentData),
+    ...parsed,
     title: parsed.title || fragment.title || "Untitled Graph", // Fallback to fragment title or default
     fragmentId: fragment.id,
   }
@@ -335,13 +405,15 @@ export async function listGraphs(workspaceId: string, accessToken: string): Prom
     let parameterCount = 0
 
     try {
-      const content = JSON.parse(fragment.content || "{}") as Partial<GraphFragmentData>
+      const jsonParsed = JSON.parse(fragment.content || "{}")
+      const content = graphFragmentDataSchema.parse(jsonParsed)
       title = content.title || fragment.title || "Untitled Graph"
       dataSourceRef = content.dataSourceRef || "unknown"
-      visualizationType = content.visualization?.type || "table"
-      parameterCount = content.parameterSchema?.parameters?.length || 0
-    } catch {
-      // If parsing fails, use defaults
+      visualizationType = content.visualization.type || "table"
+      parameterCount = content.parameterSchema.parameters.length || 0
+    } catch (error) {
+      // If parsing/validation fails, use defaults and log warning
+      console.warn(`Failed to parse graph fragment ${fragment.id}:`, error)
     }
 
     return {

@@ -1,9 +1,7 @@
 "use client"
 
-import { GraphCreationModal } from "@/components/graph-creation-modal"
 import { GraphTile } from "@/components/graph-tile"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import type { DashboardFragmentData } from "@/lib/services/dashboard.service"
 import { cn } from "@/lib/utils"
 import { PlusIcon, SettingsIcon } from "lucide-react"
@@ -64,8 +62,6 @@ export function DashboardEditor({
   })
   const [isSaving, setIsSaving] = useState(false)
   const [showGridSettings, setShowGridSettings] = useState(false)
-  const [showGraphModal, setShowGraphModal] = useState(false)
-  const [graphModalPosition, setGraphModalPosition] = useState<{ x: number; y: number } | undefined>()
   const router = useRouter()
 
   // Convert dashboard tiles to react-grid-layout format
@@ -87,18 +83,29 @@ export function DashboardEditor({
     (newLayout: LayoutItem[]) => {
       setCurrentLayout(newLayout)
 
-      // Auto-expand grid if needed
-      const maxX = Math.max(...newLayout.map((item) => item.x + item.w), 0)
-
+      // Auto-expand grid columns if needed
+      const maxX = newLayout.length > 0 ? Math.max(...newLayout.map((item) => item.x + item.w), 0) : 0
       if (maxX >= gridConfig.cols) {
         const newCols = Math.max(gridConfig.cols, maxX + 2) // Add padding
-        if (newCols !== gridConfig.cols) {
+        if (newCols !== gridConfig.cols && newCols <= 24) {
           setGridConfig((prev) => ({ ...prev, cols: newCols }))
         }
       }
-      // Note: rows are handled differently - we'll update the dashboard layout on save
+
+      // Auto-expand grid rows if needed (update layout.grid.rows)
+      const maxY = newLayout.length > 0 ? Math.max(...newLayout.map((item) => item.y + item.h), 0) : 0
+      const currentRows = layout.grid.rows
+      if (maxY >= currentRows) {
+        const newRows = Math.max(currentRows, maxY + 2) // Add padding
+        // Update layout.grid.rows in the dashboard data structure
+        // This will be persisted when saving
+        if (newRows !== currentRows && newRows <= 100) {
+          // Update local layout state
+          layout.grid.rows = newRows
+        }
+      }
     },
-    [gridConfig.cols]
+    [gridConfig.cols, layout]
   )
 
   // Convert react-grid-layout format back to dashboard format
@@ -142,17 +149,10 @@ export function DashboardEditor({
     }
   }, [currentLayout, convertToDashboardLayout, onSave])
 
-  // Handle add graph button click
-  const handleAddGraph = useCallback((x: number, y: number) => {
-    setGraphModalPosition({ x, y })
-    setShowGraphModal(true)
-  }, [])
-
-  // Handle graph created callback
-  const handleGraphCreated = useCallback(() => {
-    // Refresh the page to show the new graph
-    router.refresh()
-  }, [router])
+  // Handle add graph button click - navigate to new graph page
+  const handleAddGraph = useCallback(() => {
+    router.push(`/dashboards/${dashboardId}/graphs/new`)
+  }, [dashboardId, router])
 
   // Grid settings handlers
   const handleGridConfigChange = useCallback((updates: { columns?: number }) => {
@@ -187,30 +187,24 @@ export function DashboardEditor({
               </div>
             )}
           </div>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? "Saving..." : "Save Dashboard"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleAddGraph}>
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Add Graph
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? "Saving..." : "Save Dashboard"}
+            </Button>
+          </div>
         </div>
       )}
 
       {/* Grid Layout */}
       {currentLayout.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground">No graphs added to this dashboard yet</p>
-            {isEditing && (
-              <>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Click "Add Graph" to create a new graph on this dashboard
-                </p>
-                <Button variant="outline" className="mt-4" onClick={() => handleAddGraph(0, 0)}>
-                  <PlusIcon className="h-4 w-4 mr-2" />
-                  Add Your First Graph
-                </Button>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-muted-foreground/20 rounded-lg">
+          <p className="text-muted-foreground mb-2">No graphs added to this dashboard yet</p>
+          <p className="text-sm text-muted-foreground">Click "Add Graph" to create your first graph</p>
+        </div>
       ) : (
         <div className="relative">
           <ResponsiveGridLayout
@@ -231,6 +225,7 @@ export function DashboardEditor({
             margin={[16, 16]}
             containerPadding={[0, 0]}
           >
+            {/* Render graph tiles */}
             {currentLayout.map((item) => {
               const handleDelete = async () => {
                 // Remove tile from layout
@@ -240,44 +235,23 @@ export function DashboardEditor({
                   await onSave(convertToDashboardLayout(updatedLayout))
                 }
               }
+              const handleEdit = () => {
+                router.push(`/dashboards/${dashboardId}/graphs/${item.i}/edit`)
+              }
               return (
                 <div key={item.i} className={cn("bg-card border rounded-lg", !isEditing && "cursor-default")}>
-                  <GraphTile graphId={item.i} workspaceId={workspaceId} isEditing={isEditing} onDelete={handleDelete} />
+                  <GraphTile
+                    graphId={item.i}
+                    workspaceId={workspaceId}
+                    isEditing={isEditing}
+                    onDelete={handleDelete}
+                    onEdit={handleEdit}
+                  />
                 </div>
               )
             })}
           </ResponsiveGridLayout>
-
-          {/* Add Graph Button Overlay (shown in empty areas) */}
-          {isEditing && (
-            <div className="absolute top-4 right-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  // Add graph at the end of the grid
-                  const maxY = Math.max(...currentLayout.map((item) => item.y + item.h), 0)
-                  handleAddGraph(0, maxY + 1)
-                }}
-              >
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Add Graph
-              </Button>
-            </div>
-          )}
         </div>
-      )}
-
-      {/* Graph Creation Modal */}
-      {showGraphModal && (
-        <GraphCreationModal
-          open={showGraphModal}
-          onOpenChange={setShowGraphModal}
-          dashboardId={dashboardId}
-          workspaceId={workspaceId}
-          initialPosition={graphModalPosition}
-          onGraphCreated={handleGraphCreated}
-        />
       )}
     </div>
   )

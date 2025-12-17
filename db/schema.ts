@@ -1,4 +1,4 @@
-import { boolean, index, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core"
+import { boolean, index, jsonb, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core"
 
 export const users = pgTable(
   "users",
@@ -130,3 +130,33 @@ export const parameterPermissions = pgTable(
 
 export type ParameterPermission = typeof parameterPermissions.$inferSelect
 export type NewParameterPermission = typeof parameterPermissions.$inferInsert
+
+// Data source secrets (operational data - secret references stored here, NOT in Usable fragments)
+// SECURITY: This table stores only secret REFERENCES (keys), NOT the actual secrets
+// Secret reference structure: { provider: "azure-key-vault", vaultUrl: string, secretName: string, version?: string }
+// Actual secrets remain in Azure Key Vault and are fetched on-demand using the reference
+// Events do NOT contain secret references or sensitive data - only dataSourceId/fragmentId
+// Note: dataSourceId is a fragment ID (no separate cache table)
+export const dataSourceSecrets = pgTable(
+  "data_source_secrets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    dataSourceId: uuid("data_source_id").notNull(), // Fragment ID (Usable fragment ID used as data source ID)
+    workspaceId: uuid("workspace_id").notNull(), // Workspace ID for access control
+    secretRef: jsonb("secret_ref").notNull(), // JSON object with secret reference (key) to fetch from Azure Key Vault: { provider, vaultUrl, secretName, version }
+    sourceEventId: varchar("source_event_id", { length: 255 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    dataSourceIdIdx: index("data_source_secrets_data_source_id_idx").on(table.dataSourceId),
+    workspaceIdIdx: index("data_source_secrets_workspace_id_idx").on(table.workspaceId),
+    dataSourceIdWorkspaceIdIdx: index("data_source_secrets_data_source_id_workspace_id_idx").on(
+      table.dataSourceId,
+      table.workspaceId
+    ),
+  })
+)
+
+export type DataSourceSecret = typeof dataSourceSecrets.$inferSelect
+export type NewDataSourceSecret = typeof dataSourceSecrets.$inferInsert

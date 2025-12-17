@@ -77,5 +77,23 @@ scenario:
           value: graphable-webhook-secret
       blueprint:
         artifactUrl: "https://flowcore-public-runtimes.s3.eu-west-1.amazonaws.com/transformer-proxy-1.4.1.zip"
+    datasource:
+      description: "Graphable data source lifecycle transformer"
+      dataCore: graphable
+      flowType: graphable.datasource.0
+      shell: flowcoreio/adapter-nodejs-transformer-shell:2.4.1
+      events:
+        - datasource.created.0
+        - datasource.updated.0
+        - datasource.deleted.0
+      parameters:
+        - name: PROXY_ENDPOINT
+          type: manual
+          value: "http://graphable.public-sites:3000/api/transformer"
+        - name: PROXY_HEADER_SECRET
+          type: secret
+          value: graphable-webhook-secret
+      blueprint:
+        artifactUrl: "https://flowcore-public-runtimes.s3.eu-west-1.amazonaws.com/transformer-proxy-1.4.1.zip"
 
 

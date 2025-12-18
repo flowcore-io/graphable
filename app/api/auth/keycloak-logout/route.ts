@@ -22,7 +22,6 @@ export async function GET(request: Request) {
   const issuer = env.USABLE_OIDC_ISSUER
   // idToken is stored in JWT but not exposed in Session type
   // Access it via type assertion since it's set in auth.ts callbacks
-  // biome-ignore lint/suspicious/noExplicitAny: idToken is not in Session type but exists at runtime
   const idToken: string | undefined = (session as { idToken?: string })?.idToken
 
   if (!issuer || !idToken) {

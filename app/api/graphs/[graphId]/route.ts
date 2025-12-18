@@ -92,7 +92,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ grap
       return NextResponse.json({ graph })
     } catch (error) {
       console.error("Error getting graph:", error)
-      const { graphId: errorGraphId } = await params
       return NextResponse.json({ error: "Failed to get graph" }, { status: 500 })
     }
   })(req)
@@ -150,7 +149,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ grap
       return NextResponse.json(result)
     } catch (error) {
       console.error("Error updating graph:", error)
-      const { graphId: errorGraphId } = await params
       const errorMessage = error instanceof Error ? error.message : "Failed to update graph"
       return NextResponse.json({ error: errorMessage }, { status: 500 })
     }
@@ -194,7 +192,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ g
       return NextResponse.json(result)
     } catch (error) {
       console.error("Error deleting graph:", error)
-      const { graphId: errorGraphId } = await params
       const errorMessage = error instanceof Error ? error.message : "Failed to delete graph"
       return NextResponse.json({ error: errorMessage }, { status: 500 })
     }

@@ -180,7 +180,7 @@ export function bindParametersToQuery(
     const providedValue = providedParameters[paramDef.name]
 
     // Use default value if not provided
-    let value = providedValue !== undefined && providedValue !== null ? providedValue : paramDef.default
+    const value = providedValue !== undefined && providedValue !== null ? providedValue : paramDef.default
 
     // Skip "All" values - treat as null/undefined to skip the filter
     if (value === "All" || value === "all") {
@@ -230,7 +230,7 @@ export function bindParametersToQuery(
   // Extract parameter values in order of appearance
   for (const paramDef of parameters) {
     const providedValue = providedParameters[paramDef.name]
-    let value = providedValue !== undefined && providedValue !== null ? providedValue : paramDef.default
+    const value = providedValue !== undefined && providedValue !== null ? providedValue : paramDef.default
 
     // Skip "All" values - treat as null/undefined to skip the filter
     if (value === "All" || value === "all") {

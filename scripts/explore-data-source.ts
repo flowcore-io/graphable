@@ -5,13 +5,13 @@
  * Usage: bun scripts/explore-data-source.ts [data-source-name]
  */
 
-import { Client } from "pg"
 import * as dotenv from "dotenv"
+import { Client } from "pg"
 
 // Load environment variables
 dotenv.config()
 
-const DATA_SOURCE_NAME = process.argv[2] || "tk-child-db"
+const _DATA_SOURCE_NAME = process.argv[2] || "tk-child-db"
 const CONNECTION_STRING = process.env.DATA_SOURCE_CONNECTION_STRING
 
 if (!CONNECTION_STRING) {
@@ -102,18 +102,14 @@ async function exploreDatabase() {
       }
 
       // Get row count
-      const countResult = await client.query(
-        `SELECT COUNT(*) as count FROM "${schema}"."${name}"`
-      )
+      const countResult = await client.query(`SELECT COUNT(*) as count FROM "${schema}"."${name}"`)
       const rowCount = parseInt(countResult.rows[0].count, 10)
       console.log(`\nRow count: ${rowCount}`)
 
       // Sample rows (up to 5)
       if (rowCount > 0) {
         console.log("\nSample data (first 5 rows):")
-        const sampleResult = await client.query(
-          `SELECT * FROM "${schema}"."${name}" LIMIT 5`
-        )
+        const sampleResult = await client.query(`SELECT * FROM "${schema}"."${name}" LIMIT 5`)
 
         if (sampleResult.rows.length > 0) {
           // Print header
@@ -135,7 +131,7 @@ async function exploreDatabase() {
 
       // Suggest graph queries
       console.log("\n💡 Suggested graph queries:")
-      
+
       // Check for date/timestamp columns
       const dateColumns = columnsResult.rows
         .filter((col) => col.data_type.includes("date") || col.data_type.includes("timestamp"))
@@ -204,7 +200,3 @@ exploreDatabase().catch((error) => {
   console.error("Fatal error:", error)
   process.exit(1)
 })
-
-
-
-

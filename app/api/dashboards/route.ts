@@ -14,7 +14,7 @@ export const runtime = "nodejs"
  * Schema for creating a dashboard
  */
 const createDashboardSchema = z.object({
-  title: z.string().min(1, "Title is required").optional(),
+  title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   folderId: z.string().uuid("Invalid folder ID format").optional(),
   layout: z.object({

@@ -301,7 +301,8 @@ export const authOptions: NextAuthOptions = {
           // Set error to trigger middleware redirect to explanation page
           token.error = "MissingUsableUserId"
           // Don't set session data - this will cause session to be invalid
-          return null as any // Return null to invalidate session
+          // biome-ignore lint/suspicious/noExplicitAny: NextAuth JWT callback can return null to invalidate session
+          return null as unknown as JWT // Return null to invalidate session
         }
 
         // Use Usable user ID (required - we've already validated it exists above)

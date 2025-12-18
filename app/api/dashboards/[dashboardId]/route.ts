@@ -53,7 +53,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ dash
       })
     } catch (error) {
       console.error("Error getting dashboard:", error)
-      const { dashboardId: errorDashboardId } = await params
       return NextResponse.json({ error: "Failed to get dashboard" }, { status: 500 })
     }
   })(req)
@@ -121,7 +120,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ dash
       return NextResponse.json(result)
     } catch (error) {
       console.error("Error updating dashboard:", error)
-      const { dashboardId: errorDashboardId } = await params
       const errorMessage = error instanceof Error ? error.message : "Failed to update dashboard"
       return NextResponse.json({ error: errorMessage }, { status: 500 })
     }
@@ -162,7 +160,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ d
       return NextResponse.json(result)
     } catch (error) {
       console.error("Error deleting dashboard:", error)
-      const { dashboardId: errorDashboardId } = await params
       const errorMessage = error instanceof Error ? error.message : "Failed to delete dashboard"
       return NextResponse.json({ error: errorMessage }, { status: 500 })
     }

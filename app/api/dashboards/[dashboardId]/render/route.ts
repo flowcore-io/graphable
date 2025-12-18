@@ -49,14 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ dash
       })
     } catch (error) {
       console.error("Error rendering dashboard:", error)
-      const { dashboardId: errorDashboardId } = await params
       return NextResponse.json({ error: "Failed to render dashboard" }, { status: 500 })
     }
   })(req)
 }
-
-
-
-
-
-

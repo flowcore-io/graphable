@@ -41,14 +41,14 @@ export interface RequireWorkspaceOptions {
  * });
  * ```
  */
-export function requireWorkspace<T = any>(
+export function requireWorkspace(
   handler: (
     req: NextRequest,
     context: { workspaceId: string; userId: string; accessToken: string }
-  ) => Promise<NextResponse<T>>,
+  ) => Promise<NextResponse<any>>,
   options: RequireWorkspaceOptions = {}
 ) {
-  return async (req: NextRequest): Promise<NextResponse<T> | NextResponse<{ error: string }>> => {
+  return async (req: NextRequest): Promise<NextResponse<any>> => {
     try {
       // Layer 1 - Authentication (401)
       const session = await getServerSession(authOptions)

@@ -10,7 +10,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useWorkspace } from "@/lib/context/workspace-context"
 import { ArrowLeftIcon } from "lucide-react"
@@ -152,13 +151,8 @@ export default function DeleteDashboardPage() {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel asChild>
-                    <Button
-                      variant="outline"
-                      nativeButton={false}
-                      render={<Link href={`/dashboards/${dashboardId}`}>Cancel</Link>}
-                      disabled={isDeleting}
-                    />
+                  <AlertDialogCancel disabled={isDeleting} onClick={() => router.push(`/dashboards/${dashboardId}`)}>
+                    Cancel
                   </AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDelete}

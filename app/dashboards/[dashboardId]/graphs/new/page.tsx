@@ -1,48 +1,86 @@
 "use client"
 
+import { GraphParametersEditor } from "@/components/graph-parameters-editor"
 import { GraphPreview } from "@/components/graph-preview"
-import { Button } from "@/components/ui/button"
+import { QueriesEditor } from "@/components/queries-editor"
+import { TimeRangeSelector } from "@/components/time-range-selector"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+import { VisualizationOptionsEditor } from "@/components/visualization-options-editor"
+import { GraphEditorProvider, useGraphEditor } from "@/lib/context/graph-editor-context"
 import { useWorkspace } from "@/lib/context/workspace-context"
 import type { ParameterDefinition } from "@/lib/services/graph.service"
+import { cn } from "@/lib/utils"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowLeftIcon, Loader2Icon, PlusIcon, TrashIcon } from "lucide-react"
+import { ArrowLeftIcon, Loader2Icon, PlayIcon } from "lucide-react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 
+// Query or expression schema for form
+const queryOrExpressionFormSchema = z.union([
+  z.object({
+    refId: z.string().regex(/^[A-Z]$/, "refId must be a single uppercase letter"),
+    dialect: z.literal("sql"),
+    text: z.string().min(1, "Query text is required"),
+    dataSourceRef: z.string().min(1, "Data source reference is required"),
+    parameters: z.array(z.any()).optional().default([]),
+  }),
+  z.object({
+    refId: z.string().regex(/^[A-Z]$/, "refId must be a single uppercase letter"),
+    operation: z.enum(["math", "reduce", "resample"]),
+    expression: z.string().min(1, "Expression is required"),
+  }),
+])
+
 // Graph creation form schema
-const createGraphFormSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  dataSourceRef: z.string().min(1, "Data source reference is required"),
-  connectorRef: z.string().optional(),
-  queryText: z.string().min(1, "Query text is required"),
-  visualizationType: z.enum(["line", "bar", "table", "pie", "scatter", "area"]),
-  visualizationOptions: z.string().optional(), // JSON string
-  parameters: z.array(
-    z.object({
-      name: z.string().min(1, "Parameter name is required"),
-      type: z.enum(["string", "number", "boolean", "date", "timestamp", "enum", "string[]", "number[]"]),
-      required: z.boolean(),
-      default: z.string().optional(),
-      enumValues: z.string().optional(), // Comma-separated for enum type
-      min: z.string().optional(),
-      max: z.string().optional(),
-      pattern: z.string().optional(),
-    })
-  ),
-})
+const createGraphFormSchema = z
+  .object({
+    title: z.string().min(1, "Title is required"),
+    dataSourceRef: z.string().optional(), // Default data source (optional when queries have their own)
+    connectorRef: z.string().optional(),
+    // Support both single query (legacy) and multiple queries
+    queryText: z.string().optional(), // Legacy single query
+    queries: z.array(queryOrExpressionFormSchema).min(1, "At least one query is required").optional(),
+    visualizationType: z.enum(["line", "bar", "table", "pie", "scatter", "area"]),
+    visualizationOptions: z.string().optional(), // JSON string
+    timeRange: z.enum(["1h", "7d", "30d", "90d", "180d", "365d", "all", "custom"]).optional(),
+    parameters: z.array(
+      z.object({
+        name: z.string().min(1, "Parameter name is required"),
+        type: z.enum(["string", "number", "boolean", "date", "timestamp", "enum", "string[]", "number[]"]),
+        required: z.boolean(),
+        default: z.string().optional(),
+        enumValues: z.string().optional(), // Comma-separated for enum type
+        min: z.string().optional(),
+        max: z.string().optional(),
+        pattern: z.string().optional(),
+      })
+    ),
+  })
+  .refine(
+    (data) => {
+      // If using single query (legacy), dataSourceRef is required
+      if (data.queryText && (!data.queries || data.queries.length === 0)) {
+        return !!data.dataSourceRef && data.dataSourceRef.trim().length > 0
+      }
+      // If using multiple queries, dataSourceRef is optional (each query has its own)
+      return true
+    },
+    {
+      message: "Data source reference is required for single query",
+      path: ["dataSourceRef"],
+    }
+  )
 
 type CreateGraphFormData = z.infer<typeof createGraphFormSchema>
 
-export default function NewGraphPage() {
+function NewGraphPageContent() {
   const { workspaceId } = useWorkspace()
   const router = useRouter()
   const params = useParams()
@@ -52,28 +90,76 @@ export default function NewGraphPage() {
   const [dataSources, setDataSources] = useState<Array<{ id: string; fragmentId: string; name: string }>>([])
   const [isLoadingDataSources, setIsLoadingDataSources] = useState(false)
 
+  const form = useForm<CreateGraphFormData>({
+    // biome-ignore lint/suspicious/noExplicitAny: Type mismatch between zod schema and react-hook-form types due to union types in queries
+    resolver: zodResolver(createGraphFormSchema) as any,
+    defaultValues: {
+      title: "",
+      dataSourceRef: "",
+      connectorRef: "",
+      queryText: "",
+      queries: [
+        {
+          refId: "A",
+          dialect: "sql",
+          text: "",
+          dataSourceRef: "",
+          parameters: [],
+          hidden: false,
+        },
+      ] as any,
+      visualizationType: "table",
+      visualizationOptions: "{}",
+      timeRange: undefined,
+      parameters: [],
+    },
+  })
+
   const {
     register,
     handleSubmit,
     formState: { errors },
     watch,
     setValue,
-  } = useForm<CreateGraphFormData>({
-    resolver: zodResolver(createGraphFormSchema),
-    defaultValues: {
-      title: "",
-      dataSourceRef: "",
-      connectorRef: "",
-      queryText: "",
-      visualizationType: "table",
-      visualizationOptions: "{}",
-      parameters: [],
-    },
-  })
+  } = form
 
   const parameters = watch("parameters")
   const formData = watch()
   const dataSourceRef = watch("dataSourceRef")
+  const timeRange = watch("timeRange")
+  const queries = watch("queries")
+  const hasMultipleQueries = queries && Array.isArray(queries) && queries.length > 0
+
+  const {
+    timeRange: contextTimeRange,
+    setTimeRange: setContextTimeRange,
+    setParameters: setContextParameters,
+    executePreview,
+  } = useGraphEditor()
+
+  // Sync form state with context (form -> context)
+  useEffect(() => {
+    if (timeRange) {
+      setContextTimeRange(timeRange as "1h" | "7d" | "30d" | "90d" | "180d" | "365d" | "all" | "custom")
+    }
+  }, [timeRange, setContextTimeRange])
+
+  useEffect(() => {
+    setContextParameters(
+      parameters.map((p) => ({
+        name: p.name,
+        type: p.type,
+        required: p.required,
+      }))
+    )
+  }, [parameters, setContextParameters])
+
+  // Sync context state with form (context -> form)
+  useEffect(() => {
+    if (contextTimeRange && contextTimeRange !== timeRange) {
+      setValue("timeRange", contextTimeRange)
+    }
+  }, [contextTimeRange, timeRange, setValue])
 
   // Fetch available data sources
   useEffect(() => {
@@ -100,6 +186,8 @@ export default function NewGraphPage() {
   }, [workspaceId])
 
   const onSubmit = async (data: CreateGraphFormData) => {
+    console.log("onSubmit called with data:", data)
+
     if (!workspaceId) {
       setError("No workspace selected")
       return
@@ -159,6 +247,31 @@ export default function NewGraphPage() {
         return paramDef
       })
 
+      // Prepare queries array (new) or single query (legacy)
+      const queries = data.queries && data.queries.length > 0 ? data.queries : undefined
+      const singleQuery =
+        !queries && data.queryText
+          ? {
+              dialect: "sql" as const,
+              text: data.queryText,
+              parameters: parameterDefinitions,
+            }
+          : undefined
+
+      // For multiple queries, derive default dataSourceRef from first SQL query if not set
+      let defaultDataSourceRef = data.dataSourceRef
+      if (queries && queries.length > 0 && (!defaultDataSourceRef || defaultDataSourceRef.trim().length === 0)) {
+        const firstSqlQuery = queries.find((q) => "dialect" in q && q.dialect === "sql" && "dataSourceRef" in q)
+        if (firstSqlQuery && "dataSourceRef" in firstSqlQuery && firstSqlQuery.dataSourceRef) {
+          defaultDataSourceRef = firstSqlQuery.dataSourceRef
+        }
+      }
+
+      // Ensure we have a dataSourceRef (required by API)
+      if (!defaultDataSourceRef || defaultDataSourceRef.trim().length === 0) {
+        throw new Error("Data source reference is required")
+      }
+
       // Create graph via API
       const response = await fetch("/api/graphs", {
         method: "POST",
@@ -169,13 +282,10 @@ export default function NewGraphPage() {
         credentials: "include",
         body: JSON.stringify({
           title: data.title,
-          dataSourceRef: data.dataSourceRef,
+          dataSourceRef: defaultDataSourceRef,
           connectorRef: data.connectorRef || undefined,
-          query: {
-            dialect: "sql",
-            text: data.queryText,
-            parameters: parameterDefinitions,
-          },
+          query: singleQuery,
+          queries: queries,
           parameterSchema: {
             parameters: parameterDefinitions,
           },
@@ -183,6 +293,7 @@ export default function NewGraphPage() {
             type: data.visualizationType,
             options: visualizationOptions,
           },
+          timeRange: data.timeRange,
         }),
       })
 
@@ -264,31 +375,6 @@ export default function NewGraphPage() {
     }
   }
 
-  const addParameter = () => {
-    const currentParams = watch("parameters")
-    setValue("parameters", [
-      ...currentParams,
-      {
-        name: "",
-        type: "string",
-        required: false,
-        default: "",
-        enumValues: "",
-        min: "",
-        max: "",
-        pattern: "",
-      },
-    ])
-  }
-
-  const removeParameter = (index: number) => {
-    const currentParams = watch("parameters")
-    setValue(
-      "parameters",
-      currentParams.filter((_, i) => i !== index)
-    )
-  }
-
   if (!workspaceId) {
     return (
       <div className="min-h-screen bg-background">
@@ -298,9 +384,9 @@ export default function NewGraphPage() {
             <p className="text-muted-foreground mb-6 max-w-md">
               You need to link a Usable workspace to get started with Graphable.
             </p>
-            <Button asChild>
-              <Link href="/onboarding/link-workspace">Link Workspace</Link>
-            </Button>
+            <Link href="/onboarding/link-workspace" className={cn(buttonVariants())}>
+              Link Workspace
+            </Link>
           </div>
         </main>
       </div>
@@ -314,21 +400,51 @@ export default function NewGraphPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" asChild>
-                <Link href={`/dashboards/${dashboardId}`}>
-                  <ArrowLeftIcon className="h-4 w-4" />
-                </Link>
-              </Button>
+              <Link
+                href={`/dashboards/${dashboardId}`}
+                className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
+              >
+                <ArrowLeftIcon className="h-4 w-4" />
+              </Link>
               <div>
                 <h1 className="text-2xl font-bold">Create New Graph</h1>
                 <p className="text-sm text-muted-foreground">Configure your graph and see a live preview</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" asChild disabled={isSubmitting}>
-                <Link href={`/dashboards/${dashboardId}`}>Cancel</Link>
-              </Button>
-              <Button onClick={handleSubmit(onSubmit)} disabled={isSubmitting}>
+              <Link
+                href={`/dashboards/${dashboardId}`}
+                className={cn(buttonVariants({ variant: "outline" }), isSubmitting && "pointer-events-none opacity-50")}
+              >
+                Cancel
+              </Link>
+              <Button
+                onClick={async () => {
+                  console.log("Create button clicked")
+                  console.log("Form errors:", form.formState.errors)
+                  console.log("Form values:", form.getValues())
+
+                  const submitHandler = handleSubmit(
+                    async (data) => {
+                      console.log("Form is valid, submitting:", data)
+                      await onSubmit(data)
+                    },
+                    (errors) => {
+                      console.error("Form validation failed:", errors)
+                      const firstError = Object.values(errors)[0]
+                      if (firstError) {
+                        setError(firstError.message || "Please fix form errors")
+                      } else {
+                        setError("Please fix form errors before submitting")
+                      }
+                    }
+                  )
+
+                  await submitHandler()
+                }}
+                disabled={isSubmitting}
+                type="button"
+              >
                 {isSubmitting ? (
                   <>
                     <Loader2Icon className="h-4 w-4 mr-2 animate-spin" />
@@ -343,30 +459,84 @@ export default function NewGraphPage() {
         </div>
       </header>
 
-      {/* Main Content - Split Layout */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Side - Graph Preview */}
-          <div className="lg:sticky lg:top-20 lg:h-[calc(100vh-8rem)]">
-            <Card className="h-full">
+      {/* Time Range & Refresh */}
+      {(() => {
+        // Check if time range is disabled in visualization options
+        let disableTimeRange = false
+        try {
+          const visualizationOptions = watch("visualizationOptions")
+          if (visualizationOptions) {
+            const parsed = JSON.parse(visualizationOptions)
+            disableTimeRange = parsed.disableTimeRange === true
+          }
+        } catch {
+          // Invalid JSON, show time range selector
+        }
+
+        if (disableTimeRange) {
+          return null
+        }
+
+        return (
+          <div className="container mx-auto px-4 py-2">
+            <TimeRangeSelector />
+          </div>
+        )
+      })()}
+
+      {/* Main Content - Two Column Layout */}
+      <main className="container mx-auto px-4 py-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Graph & Query */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Graph Preview */}
+            <Card>
               <CardHeader>
                 <CardTitle>Preview</CardTitle>
               </CardHeader>
-              <CardContent className="h-[calc(100%-4rem)] overflow-auto">
-                <GraphPreview formData={formData} workspaceId={workspaceId} />
+              <CardContent className="p-0">
+                <div className="h-[400px] w-full">
+                  <GraphPreview formData={formData} workspaceId={workspaceId} />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Queries Editor */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Queries</CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (executePreview) {
+                        void executePreview()
+                      }
+                    }}
+                    disabled={!executePreview}
+                  >
+                    <PlayIcon className="h-4 w-4 mr-2" />
+                    Run queries
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <QueriesEditor form={form} dataSources={dataSources} defaultDataSourceRef={dataSourceRef} />
               </CardContent>
             </Card>
           </div>
 
-          {/* Right Side - Form */}
-          <div className="space-y-6">
+          {/* Right Column - Settings */}
+          <div className="space-y-4">
             {error && (
               <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md border border-destructive/20">
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               {/* Basic Settings */}
               <Card>
                 <CardHeader>
@@ -383,81 +553,54 @@ export default function NewGraphPage() {
                     </FieldContent>
                   </Field>
 
-                  <Field>
-                    <FieldLabel>
-                      Data Source <span className="text-destructive">*</span>
-                    </FieldLabel>
-                    <FieldContent>
-                      {isLoadingDataSources ? (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Loader2Icon className="h-4 w-4 animate-spin" />
-                          Loading data sources...
-                        </div>
-                      ) : (
-                        <Select
-                          value={dataSourceRef}
-                          onValueChange={(value) => setValue("dataSourceRef", value)}
-                          aria-invalid={!!errors.dataSourceRef}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a data source" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {dataSources.length === 0 ? (
-                              <div className="p-2 text-sm text-muted-foreground">No data sources available</div>
-                            ) : (
-                              dataSources.map((ds) => (
-                                <SelectItem key={ds.fragmentId} value={ds.fragmentId}>
-                                  {ds.name}
-                                </SelectItem>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      <FieldDescription>Select a data source to query</FieldDescription>
-                      <FieldError errors={errors.dataSourceRef ? [errors.dataSourceRef] : undefined} />
-                    </FieldContent>
-                  </Field>
-
-                  <Field>
-                    <FieldLabel>Connector Reference</FieldLabel>
-                    <FieldContent>
-                      <Input
-                        {...register("connectorRef")}
-                        placeholder="connector-id (optional)"
-                        aria-invalid={!!errors.connectorRef}
-                      />
-                      <FieldError errors={errors.connectorRef ? [errors.connectorRef] : undefined} />
-                    </FieldContent>
-                  </Field>
-                </CardContent>
-              </Card>
-
-              {/* Query Settings */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Query</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Field>
-                    <FieldLabel>
-                      SQL Query <span className="text-destructive">*</span>
-                    </FieldLabel>
-                    <FieldContent>
-                      <Textarea
-                        {...register("queryText")}
-                        placeholder="SELECT * FROM table WHERE id = :id"
-                        rows={8}
-                        className="font-mono text-sm"
-                        aria-invalid={!!errors.queryText}
-                      />
-                      <FieldDescription>
-                        Use :paramName or $1, $2 for parameters. Example: SELECT * FROM users WHERE age &gt; :minAge
-                      </FieldDescription>
-                      <FieldError errors={errors.queryText ? [errors.queryText] : undefined} />
-                    </FieldContent>
-                  </Field>
+                  {/* Only show default data source selector when not using multiple queries */}
+                  {!hasMultipleQueries ? (
+                    <Field>
+                      <FieldLabel>
+                        Data Source <span className="text-destructive">*</span>
+                      </FieldLabel>
+                      <FieldContent>
+                        {isLoadingDataSources ? (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Loader2Icon className="h-4 w-4 animate-spin" />
+                            Loading data sources...
+                          </div>
+                        ) : (
+                          <Select
+                            value={dataSourceRef || undefined}
+                            onValueChange={(value: string | null) => {
+                              if (value) {
+                                setValue("dataSourceRef", value)
+                              }
+                            }}
+                            aria-invalid={!!errors.dataSourceRef}
+                          >
+                            <SelectTrigger>
+                              <SelectValue>
+                                {dataSourceRef
+                                  ? dataSources.find((ds) => ds.fragmentId === (dataSourceRef || ""))?.name ||
+                                    dataSourceRef
+                                  : "Select a data source"}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {dataSources.length === 0 ? (
+                                <div className="p-2 text-sm text-muted-foreground">No data sources available</div>
+                              ) : (
+                                dataSources.map((ds) => (
+                                  <SelectItem key={ds.fragmentId} value={ds.fragmentId}>
+                                    {ds.name}
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        <FieldDescription>Select a data source to query</FieldDescription>
+                        <FieldError errors={errors.dataSourceRef ? [errors.dataSourceRef] : undefined} />
+                      </FieldContent>
+                    </Field>
+                  ) : null}
                 </CardContent>
               </Card>
 
@@ -494,186 +637,15 @@ export default function NewGraphPage() {
                     </FieldContent>
                   </Field>
 
-                  <Field>
-                    <FieldLabel>Visualization Options (JSON)</FieldLabel>
-                    <FieldContent>
-                      <Textarea
-                        {...register("visualizationOptions")}
-                        placeholder='{"colors": ["#8884d8", "#82ca9d"], "showLegend": true}'
-                        rows={4}
-                      />
-                      <FieldDescription>Optional JSON configuration for visualization styling</FieldDescription>
-                    </FieldContent>
-                  </Field>
+                  {/* Visualization Options */}
+                  {/* @ts-expect-error - Form type mismatch due to optional fields, but structure is compatible */}
+                  <VisualizationOptionsEditor form={form} />
                 </CardContent>
               </Card>
 
               {/* Parameters */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Parameters</CardTitle>
-                    <Button type="button" variant="outline" size="sm" onClick={addParameter}>
-                      <PlusIcon className="h-4 w-4 mr-2" />
-                      Add Parameter
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {parameters.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
-                      No parameters defined. Click "Add Parameter" to add one.
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {parameters.map((param, index) => {
-                        const paramKey = param.name ? `param-${param.name}-${index}` : `param-${index}`
-                        return (
-                          <div key={paramKey} className="border rounded-lg p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-sm font-medium">Parameter {index + 1}</Label>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => removeParameter(index)}
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </Button>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                              <Field>
-                                <FieldLabel>
-                                  Name <span className="text-destructive">*</span>
-                                </FieldLabel>
-                                <FieldContent>
-                                  <Input
-                                    {...register(`parameters.${index}.name`)}
-                                    placeholder="paramName"
-                                    aria-invalid={!!errors.parameters?.[index]?.name}
-                                  />
-                                  <FieldError
-                                    errors={
-                                      errors.parameters?.[index]?.name
-                                        ? [errors.parameters[index]?.name ?? { message: "Invalid parameter name" }]
-                                        : undefined
-                                    }
-                                  />
-                                </FieldContent>
-                              </Field>
-
-                              <Field>
-                                <FieldLabel>
-                                  Type <span className="text-destructive">*</span>
-                                </FieldLabel>
-                                <FieldContent>
-                                  <Select
-                                    value={watch(`parameters.${index}.type`)}
-                                    onValueChange={(value) =>
-                                      setValue(
-                                        `parameters.${index}.type`,
-                                        value as
-                                          | "string"
-                                          | "number"
-                                          | "boolean"
-                                          | "date"
-                                          | "timestamp"
-                                          | "enum"
-                                          | "string[]"
-                                          | "number[]"
-                                      )
-                                    }
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="string">String</SelectItem>
-                                      <SelectItem value="number">Number</SelectItem>
-                                      <SelectItem value="boolean">Boolean</SelectItem>
-                                      <SelectItem value="date">Date</SelectItem>
-                                      <SelectItem value="timestamp">Timestamp</SelectItem>
-                                      <SelectItem value="enum">Enum</SelectItem>
-                                      <SelectItem value="string[]">String Array</SelectItem>
-                                      <SelectItem value="number[]">Number Array</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </FieldContent>
-                              </Field>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                {...register(`parameters.${index}.required`)}
-                                className="rounded"
-                              />
-                              <Label>Required</Label>
-                            </div>
-
-                            {watch(`parameters.${index}.type`) === "enum" && (
-                              <Field>
-                                <FieldLabel>Enum Values (comma-separated)</FieldLabel>
-                                <FieldContent>
-                                  <Input
-                                    {...register(`parameters.${index}.enumValues`)}
-                                    placeholder="value1, value2, value3"
-                                  />
-                                </FieldContent>
-                              </Field>
-                            )}
-
-                            {(watch(`parameters.${index}.type`) === "number" ||
-                              watch(`parameters.${index}.type`) === "string") && (
-                              <div className="grid grid-cols-2 gap-3">
-                                {watch(`parameters.${index}.type`) === "number" && (
-                                  <>
-                                    <Field>
-                                      <FieldLabel>Min</FieldLabel>
-                                      <FieldContent>
-                                        <Input {...register(`parameters.${index}.min`)} type="number" placeholder="0" />
-                                      </FieldContent>
-                                    </Field>
-                                    <Field>
-                                      <FieldLabel>Max</FieldLabel>
-                                      <FieldContent>
-                                        <Input
-                                          {...register(`parameters.${index}.max`)}
-                                          type="number"
-                                          placeholder="100"
-                                        />
-                                      </FieldContent>
-                                    </Field>
-                                  </>
-                                )}
-                                {watch(`parameters.${index}.type`) === "string" && (
-                                  <Field>
-                                    <FieldLabel>Pattern (regex)</FieldLabel>
-                                    <FieldContent>
-                                      <Input {...register(`parameters.${index}.pattern`)} placeholder="^[A-Z]+$" />
-                                    </FieldContent>
-                                  </Field>
-                                )}
-                              </div>
-                            )}
-
-                            <Field>
-                              <FieldLabel>Default Value</FieldLabel>
-                              <FieldContent>
-                                <Input
-                                  {...register(`parameters.${index}.default`)}
-                                  placeholder="default value (optional)"
-                                />
-                              </FieldContent>
-                            </Field>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              {/* @ts-expect-error - Form type mismatch due to optional fields, but structure is compatible */}
+              <GraphParametersEditor form={form} />
             </form>
           </div>
         </div>
@@ -681,3 +653,15 @@ export default function NewGraphPage() {
     </div>
   )
 }
+
+export default function NewGraphPage() {
+  return (
+    <GraphEditorProvider>
+      <NewGraphPageContent />
+    </GraphEditorProvider>
+  )
+}
+
+
+
+

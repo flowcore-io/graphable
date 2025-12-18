@@ -301,7 +301,8 @@ export async function executeQuery(
   query: string,
   page: number = 1,
   pageSize: number = 50,
-  accessToken: string
+  accessToken: string,
+  preBoundParameters?: unknown[]
 ): Promise<{
   rows: unknown[]
   columns: string[]
@@ -373,16 +374,34 @@ export async function executeQuery(
 
       if (hasLimit || hasOffset) {
         // Query already has LIMIT/OFFSET, wrap it in a subquery
-        const wrappedQuery = `SELECT * FROM (${trimmedQuery}) as subquery LIMIT $1 OFFSET $2`
-        result = await client.query(wrappedQuery, [validatedPageSize, offset])
+        // If we have pre-bound parameters, we need to account for them
+        if (preBoundParameters && preBoundParameters.length > 0) {
+          const paramIndex = preBoundParameters.length + 1
+          const wrappedQuery = `SELECT * FROM (${trimmedQuery}) as subquery LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`
+          result = await client.query(wrappedQuery, [...preBoundParameters, validatedPageSize, offset])
+        } else {
+          const wrappedQuery = `SELECT * FROM (${trimmedQuery}) as subquery LIMIT $1 OFFSET $2`
+          result = await client.query(wrappedQuery, [validatedPageSize, offset])
+        }
       } else {
         // Add LIMIT and OFFSET directly
-        const paginatedQuery = `${trimmedQuery} LIMIT $1 OFFSET $2`
-        result = await client.query(paginatedQuery, [validatedPageSize, offset])
+        // If we have pre-bound parameters, adjust the parameter indices
+        if (preBoundParameters && preBoundParameters.length > 0) {
+          const paramIndex = preBoundParameters.length + 1
+          const paginatedQuery = `${trimmedQuery} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`
+          result = await client.query(paginatedQuery, [...preBoundParameters, validatedPageSize, offset])
+        } else {
+          const paginatedQuery = `${trimmedQuery} LIMIT $1 OFFSET $2`
+          result = await client.query(paginatedQuery, [validatedPageSize, offset])
+        }
       }
     } else {
       // For non-SELECT queries (INSERT, UPDATE, DELETE, etc.), execute without pagination
-      result = await client.query(trimmedQuery)
+      if (preBoundParameters && preBoundParameters.length > 0) {
+        result = await client.query(trimmedQuery, preBoundParameters)
+      } else {
+        result = await client.query(trimmedQuery)
+      }
       // For non-SELECT queries, set totalCount to affected rows
       totalCount = result.rowCount || 0
       canCount = true
@@ -426,3 +445,7 @@ export async function isWorkspaceAdmin(workspaceId: string, userId: string, acce
   // This will need to be implemented when Usable API provides workspace role endpoints
   return false
 }
+
+
+
+

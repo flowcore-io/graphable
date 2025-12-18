@@ -158,20 +158,20 @@ export function DashboardTable({ folders, dashboards, isLoading }: DashboardTabl
           <TableCell>
             <div className="flex items-center gap-2">
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+                <DropdownMenuTrigger>
                   <Button variant="ghost" size="icon-xs">
                     <MoreVerticalIcon className="h-4 w-4" />
                     <span className="sr-only">Folder actions</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
+                  <DropdownMenuItem>
                     <Link href={`/dashboards/new?folderId=${folder.id}`} className="flex items-center">
                       <PlusIcon className="h-4 w-4 mr-2" />
                       Create Dashboard in Folder
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
+                  <DropdownMenuItem>
                     <Link href={`/folders/${folder.id}/edit`} className="flex items-center">
                       <PencilIcon className="h-4 w-4 mr-2" />
                       Edit Folder
@@ -204,20 +204,20 @@ export function DashboardTable({ folders, dashboards, isLoading }: DashboardTabl
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                      <DropdownMenuTrigger>
                         <Button variant="ghost" size="icon-xs">
                           <MoreVerticalIcon className="h-4 w-4" />
                           <span className="sr-only">Dashboard actions</span>
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
+                        <DropdownMenuItem>
                           <Link href={`/dashboards/${dashboard.id}`} className="flex items-center">
                             <LayoutDashboardIcon className="h-4 w-4 mr-2" />
                             View Dashboard
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
+                        <DropdownMenuItem>
                           <Link href={`/dashboards/${dashboard.id}/edit`} className="flex items-center">
                             <PencilIcon className="h-4 w-4 mr-2" />
                             Edit Dashboard
@@ -311,14 +311,14 @@ export function DashboardTable({ folders, dashboards, isLoading }: DashboardTabl
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                        <DropdownMenuTrigger>
                           <Button variant="ghost" size="icon-xs">
                             <MoreVerticalIcon className="h-4 w-4" />
                             <span className="sr-only">Dashboard actions</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
+                          <DropdownMenuItem>
                             <Link href={`/dashboards/${dashboard.id}`} className="flex items-center">
                               <LayoutDashboardIcon className="h-4 w-4 mr-2" />
                               View Dashboard

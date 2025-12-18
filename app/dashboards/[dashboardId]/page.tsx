@@ -1,10 +1,11 @@
 import { DashboardPageClient } from "@/components/dashboard-page-client"
-import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { authOptions } from "@/lib/auth"
 import * as dashboardService from "@/lib/services/dashboard.service"
 import { getWorkspaceForUser } from "@/lib/services/tenant.service"
 import { usableApi } from "@/lib/services/usable-api.service"
+import { cn } from "@/lib/utils"
 import { getServerSession } from "next-auth"
 import Link from "next/link"
 
@@ -48,9 +49,9 @@ export default async function DashboardViewPage({ params }: { params: Promise<{ 
           <p className="text-muted-foreground mb-6 max-w-md">
             You need to link a Usable workspace to get started with Graphable.
           </p>
-          <Button asChild>
-            <Link href="/onboarding/link-workspace">Link Workspace</Link>
-          </Button>
+          <Link href="/onboarding/link-workspace" className={cn(buttonVariants())}>
+            Link Workspace
+          </Link>
         </div>
       </div>
     )
@@ -62,9 +63,9 @@ export default async function DashboardViewPage({ params }: { params: Promise<{ 
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <p className="text-muted-foreground">Dashboard not found</p>
-            <Button variant="outline" className="mt-4" asChild>
-              <Link href="/dashboards">Back to Dashboards</Link>
-            </Button>
+            <Link href="/dashboards" className={cn(buttonVariants({ variant: "outline" }), "mt-4")}>
+              Back to Dashboards
+            </Link>
           </CardContent>
         </Card>
       </div>

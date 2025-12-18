@@ -78,9 +78,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ dash
 
       // Parse and validate request body
       const body = await request.json()
+      console.log("Dashboard update request body:", JSON.stringify(body, null, 2))
+
+      const start = Date.now()
       const updateValidationResult = updateDashboardSchema.safeParse(body)
+      console.log(`Validation took ${Date.now() - start}ms`)
 
       if (!updateValidationResult.success) {
+        console.error(
+          "❌ Dashboard update validation failed:",
+          JSON.stringify(updateValidationResult.error.format(), null, 2)
+        )
         return NextResponse.json(
           {
             error: "Invalid dashboard data",
@@ -91,12 +99,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ dash
       }
 
       // Create session pathway for event emission
+      const sessionStart = Date.now()
       const sessionContext = await createSessionPathwayForAPI()
+      console.log(`Session context took ${Date.now() - sessionStart}ms`)
+
       if (!sessionContext) {
         return NextResponse.json({ error: "Failed to create session context" }, { status: 500 })
       }
 
       // Update dashboard (emits event)
+      const updateStart = Date.now()
       const result = await dashboardService.updateDashboard(
         sessionContext.pathway,
         workspaceId,
@@ -104,6 +116,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ dash
         updateValidationResult.data,
         accessToken
       )
+      console.log(`Service update took ${Date.now() - updateStart}ms`)
 
       return NextResponse.json(result)
     } catch (error) {

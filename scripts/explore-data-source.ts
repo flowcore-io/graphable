@@ -1,16 +1,17 @@
 #!/usr/bin/env bun
 
 /**
- * Script to explore a data source and understand its schema
- * Usage: bun scripts/explore-data-source.ts
+ * Script to explore a data source and understand its structure
+ * Usage: bun scripts/explore-data-source.ts [data-source-name]
  */
 
-import { config } from "dotenv"
-import postgres from "postgres"
+import { Client } from "pg"
+import * as dotenv from "dotenv"
 
 // Load environment variables
-config()
+dotenv.config()
 
+const DATA_SOURCE_NAME = process.argv[2] || "tk-child-db"
 const CONNECTION_STRING = process.env.DATA_SOURCE_CONNECTION_STRING
 
 if (!CONNECTION_STRING) {
@@ -18,181 +19,192 @@ if (!CONNECTION_STRING) {
   process.exit(1)
 }
 
+// Parse connection string
+const url = new URL(CONNECTION_STRING)
+const sslMode = url.searchParams.get("sslmode") || "prefer"
+
+// Determine SSL config
+let ssl: boolean | { rejectUnauthorized?: boolean } = false
+if (sslMode === "require" || sslMode === "verify-ca" || sslMode === "verify-full") {
+  ssl = { rejectUnauthorized: sslMode === "verify-full" || sslMode === "verify-ca" }
+}
+
+const client = new Client({
+  host: url.hostname,
+  port: parseInt(url.port || "5432", 10),
+  database: url.pathname.slice(1), // Remove leading /
+  user: decodeURIComponent(url.username),
+  password: decodeURIComponent(url.password || ""),
+  ssl,
+  connectionTimeoutMillis: 10000,
+})
+
 async function exploreDatabase() {
-  console.log("🔍 Connecting to database...\n")
-
-  const sql = postgres(CONNECTION_STRING, {
-    max: 1,
-  })
-
   try {
-    // List all schemas
-    console.log("📋 SCHEMAS:")
-    const schemas = await sql`
-      SELECT schema_name 
-      FROM information_schema.schemata 
-      WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
-      ORDER BY schema_name
-    `
-    console.table(schemas)
+    console.log(`🔌 Connecting to database: ${url.database}@${url.hostname}`)
+    await client.connect()
+    console.log("✅ Connected successfully!\n")
 
     // List all tables
-    console.log("\n📊 TABLES:")
-    const tables = await sql`
-      SELECT 
-        table_schema,
-        table_name,
-        table_type
-      FROM information_schema.tables
-      WHERE table_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
-      ORDER BY table_schema, table_name
-    `
-    console.table(tables)
+    console.log("📊 Listing tables...")
+    const tablesResult = await client.query(`
+      SELECT schemaname, tablename, tableowner
+      FROM pg_tables
+      WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+      ORDER BY schemaname, tablename
+    `)
 
-    // Get detailed info for each table
-    console.log("\n📝 TABLE DETAILS:\n")
-    for (const table of tables) {
-      const schema = table.table_schema
-      const tableName = table.table_name
+    console.log(`\nFound ${tablesResult.rows.length} tables:\n`)
+    const tables: Array<{ schema: string; name: string }> = []
 
-      console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
-      console.log(`📌 ${schema}.${tableName}`)
-      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
-
-      // Get columns
-      const columns = await sql`
-        SELECT 
-          column_name,
-          data_type,
-          is_nullable,
-          column_default
-        FROM information_schema.columns
-        WHERE table_schema = ${schema} AND table_name = ${tableName}
-        ORDER BY ordinal_position
-      `
-      console.log("\nColumns:")
-      console.table(columns)
-
-      // Get row count
-      const countResult = await sql`
-        SELECT COUNT(*) as count
-        FROM ${sql(schema)}.${sql(tableName)}
-      `
-      const rowCount = countResult[0]?.count || 0
-      console.log(`\nRow count: ${rowCount}`)
-
-      // Sample rows (limit 5)
-      if (Number(rowCount) > 0) {
-        const sampleRows = await sql`
-          SELECT *
-          FROM ${sql(schema)}.${sql(tableName)}
-          LIMIT 5
-        `
-        console.log("\nSample rows:")
-        console.table(sampleRows)
-      }
-
-      // Check for date/timestamp columns (useful for time series)
-      const dateColumns = columns.filter(
-        (col) =>
-          col.data_type === "timestamp without time zone" ||
-          col.data_type === "timestamp with time zone" ||
-          col.data_type === "date" ||
-          col.data_type === "time without time zone"
-      )
-      if (dateColumns.length > 0) {
-        console.log("\n📅 Date/Time columns found:")
-        dateColumns.forEach((col) => {
-          console.log(`  - ${col.column_name} (${col.data_type})`)
-        })
-      }
-
-      // Check for numeric columns (useful for aggregations)
-      const numericColumns = columns.filter(
-        (col) =>
-          col.data_type === "integer" ||
-          col.data_type === "bigint" ||
-          col.data_type === "smallint" ||
-          col.data_type === "numeric" ||
-          col.data_type === "real" ||
-          col.data_type === "double precision" ||
-          col.data_type === "decimal"
-      )
-      if (numericColumns.length > 0) {
-        console.log("\n🔢 Numeric columns found:")
-        numericColumns.forEach((col) => {
-          console.log(`  - ${col.column_name} (${col.data_type})`)
-        })
-      }
+    for (const row of tablesResult.rows) {
+      const schema = row.schemaname
+      const table = row.tablename
+      tables.push({ schema, name: table })
+      console.log(`  📋 ${schema}.${table}`)
     }
 
-    // Suggest graph queries
-    console.log("\n\n✨ SUGGESTED GRAPH QUERIES:\n")
-    for (const table of tables) {
-      const schema = table.table_schema
-      const tableName = table.table_name
+    // Explore each table
+    console.log("\n" + "=".repeat(80))
+    console.log("📈 Exploring table structures and sample data...\n")
 
-      const columns = await sql`
-        SELECT column_name, data_type
-        FROM information_schema.columns
-        WHERE table_schema = ${schema} AND table_name = ${tableName}
-        ORDER BY ordinal_position
-      `
+    for (const { schema, name } of tables) {
+      console.log(`\n${"─".repeat(80)}`)
+      console.log(`📋 Table: ${schema}.${name}`)
+      console.log(`${"─".repeat(80)}`)
 
-      const dateColumns = columns.filter(
-        (col) =>
-          col.data_type === "timestamp without time zone" ||
-          col.data_type === "timestamp with time zone" ||
-          col.data_type === "date"
+      // Get column information
+      const columnsResult = await client.query(
+        `
+        SELECT
+          a.attname AS column_name,
+          pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
+          a.attnotnull AS not_null,
+          a.atthasdef AS has_default
+        FROM pg_catalog.pg_attribute a
+        JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
+        JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
+        WHERE c.relname = $1
+          AND n.nspname = $2
+          AND a.attnum > 0
+          AND NOT a.attisdropped
+        ORDER BY a.attnum
+      `,
+        [name, schema]
       )
-      const numericColumns = columns.filter(
-        (col) =>
-          col.data_type === "integer" ||
-          col.data_type === "bigint" ||
-          col.data_type === "numeric" ||
-          col.data_type === "real" ||
-          col.data_type === "double precision"
+
+      console.log("\nColumns:")
+      const columns: string[] = []
+      for (const col of columnsResult.rows) {
+        columns.push(col.column_name)
+        const nullable = col.not_null ? "NOT NULL" : "NULL"
+        console.log(`  • ${col.column_name}: ${col.data_type} (${nullable})`)
+      }
+
+      // Get row count
+      const countResult = await client.query(
+        `SELECT COUNT(*) as count FROM "${schema}"."${name}"`
       )
+      const rowCount = parseInt(countResult.rows[0].count, 10)
+      console.log(`\nRow count: ${rowCount}`)
 
-      if (dateColumns.length > 0 && numericColumns.length > 0) {
-        const dateCol = dateColumns[0].column_name
-        const numericCol = numericColumns[0].column_name
-
-        console.log(`📈 Time Series (Line Chart) - ${schema}.${tableName}:`)
-        console.log(
-          `   SELECT ${dateCol}, ${numericCol} FROM ${schema}.${tableName} WHERE ${dateCol} >= NOW() - INTERVAL '30 days' ORDER BY ${dateCol}`
+      // Sample rows (up to 5)
+      if (rowCount > 0) {
+        console.log("\nSample data (first 5 rows):")
+        const sampleResult = await client.query(
+          `SELECT * FROM "${schema}"."${name}" LIMIT 5`
         )
 
-        console.log(`\n📊 Bar Chart - ${schema}.${tableName}:`)
-        console.log(`   SELECT ${dateCol}, SUM(${numericCol}) as total FROM ${schema}.${tableName} GROUP BY ${dateCol} ORDER BY ${dateCol}`)
+        if (sampleResult.rows.length > 0) {
+          // Print header
+          console.log("\n  " + columns.join(" | "))
+          console.log("  " + "-".repeat(columns.join(" | ").length))
 
-        console.log(`\n🥧 Pie Chart - ${schema}.${tableName}:`)
-        const categoryColumns = columns.filter((col) => col.data_type === "character varying" || col.data_type === "text")
-        if (categoryColumns.length > 0) {
-          const categoryCol = categoryColumns[0].column_name
-          console.log(`   SELECT ${categoryCol}, COUNT(*) as count FROM ${schema}.${tableName} GROUP BY ${categoryCol}`)
+          // Print rows
+          for (const row of sampleResult.rows) {
+            const values = columns.map((col) => {
+              const val = row[col]
+              if (val === null) return "NULL"
+              if (typeof val === "object") return JSON.stringify(val).slice(0, 50)
+              return String(val).slice(0, 50)
+            })
+            console.log("  " + values.join(" | "))
+          }
         }
       }
 
-      console.log(`\n📋 Table View - ${schema}.${tableName}:`)
-      console.log(`   SELECT * FROM ${schema}.${tableName} LIMIT 100`)
+      // Suggest graph queries
+      console.log("\n💡 Suggested graph queries:")
+      
+      // Check for date/timestamp columns
+      const dateColumns = columnsResult.rows
+        .filter((col) => col.data_type.includes("date") || col.data_type.includes("timestamp"))
+        .map((col) => col.column_name)
 
-      console.log("\n" + "─".repeat(60) + "\n")
+      // Check for numeric columns
+      const numericColumns = columnsResult.rows
+        .filter((col) => {
+          const type = col.data_type.toLowerCase()
+          return (
+            type.includes("int") ||
+            type.includes("numeric") ||
+            type.includes("decimal") ||
+            type.includes("float") ||
+            type.includes("double") ||
+            type.includes("real")
+          )
+        })
+        .map((col) => col.column_name)
+
+      // Check for text/categorical columns
+      const textColumns = columnsResult.rows
+        .filter((col) => {
+          const type = col.data_type.toLowerCase()
+          return type.includes("text") || type.includes("varchar") || type.includes("char")
+        })
+        .map((col) => col.column_name)
+
+      if (dateColumns.length > 0 && numericColumns.length > 0) {
+        console.log(`\n  📈 Time Series (Line/Bar Chart):`)
+        console.log(
+          `     SELECT ${dateColumns[0]} as date, ${numericColumns[0]} as value FROM "${schema}"."${name}" ORDER BY ${dateColumns[0]}`
+        )
+      }
+
+      if (textColumns.length > 0 && numericColumns.length > 0) {
+        console.log(`\n  📊 Bar Chart (by category):`)
+        console.log(
+          `     SELECT ${textColumns[0]} as category, SUM(${numericColumns[0]}) as total FROM "${schema}"."${name}" GROUP BY ${textColumns[0]} ORDER BY total DESC`
+        )
+
+        console.log(`\n  🥧 Pie Chart (distribution):`)
+        console.log(
+          `     SELECT ${textColumns[0]} as category, COUNT(*) as count FROM "${schema}"."${name}" GROUP BY ${textColumns[0]} ORDER BY count DESC LIMIT 10`
+        )
+      }
+
+      if (columns.length > 0) {
+        console.log(`\n  📋 Table View:`)
+        console.log(`     SELECT * FROM "${schema}"."${name}" LIMIT 100`)
+      }
     }
+
+    console.log("\n" + "=".repeat(80))
+    console.log("✅ Exploration complete!")
   } catch (error) {
     console.error("❌ Error exploring database:", error)
     throw error
   } finally {
-    await sql.end()
+    await client.end()
+    console.log("\n🔌 Disconnected from database")
   }
 }
 
-exploreDatabase()
-  .then(() => {
-    console.log("\n✅ Exploration complete!")
-    process.exit(0)
-  })
-  .catch((error) => {
-    console.error("\n❌ Exploration failed:", error)
-    process.exit(1)
-  })
+exploreDatabase().catch((error) => {
+  console.error("Fatal error:", error)
+  process.exit(1)
+})
+
+
+
+

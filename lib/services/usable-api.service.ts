@@ -79,7 +79,17 @@ export class UsableApiService {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Usable API error: ${response.status} ${response.statusText}`)
+      const errorMessage =
+        errorData.error || errorData.message || `Usable API error: ${response.status} ${response.statusText}`
+      console.error("Usable API error:", {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData,
+        errorDetails: errorData.details ? JSON.stringify(errorData.details, null, 2) : undefined,
+        endpoint,
+        method: fetchOptions.method || "GET",
+      })
+      throw new Error(errorMessage)
     }
 
     return response.json()

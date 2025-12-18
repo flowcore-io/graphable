@@ -107,3 +107,8 @@ echo ""
 echo "💡 Tip: You can test access with:"
 echo "   az keyvault secret set --vault-name $VAULT_NAME --name test-secret --value test-value"
 echo ""
+
+
+
+
+

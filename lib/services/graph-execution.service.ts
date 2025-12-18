@@ -1,5 +1,6 @@
 import type { DashboardFragmentData } from "./dashboard.service"
 import * as dashboardService from "./dashboard.service"
+import * as databaseExplorationService from "./database-exploration.service"
 import type { GraphFragmentData } from "./graph.service"
 import * as graphService from "./graph.service"
 import { validateParameters } from "./parameter-validation.service"
@@ -7,6 +8,7 @@ import { validateParameters } from "./parameter-validation.service"
 /**
  * Execute a graph query via worker service
  * Returns result data for visualization
+ * Supports both single query (legacy) and multiple queries with expressions
  */
 export async function executeGraph(
   workspaceId: string,
@@ -36,48 +38,557 @@ export async function executeGraph(
     }
   }
 
+  // Check if time range is disabled in visualization options
+  const disableTimeRange =
+    graph.visualization?.options && typeof graph.visualization.options === "object"
+      ? (graph.visualization.options as Record<string, unknown>).disableTimeRange === true
+      : false
+
+  // Support multiple queries (new) or single query (legacy)
+  if (graph.queries && graph.queries.length > 0) {
+    return await executeMultipleQueries(graph, workspaceId, parametersWithDefaults, accessToken, disableTimeRange)
+  } else if (graph.query) {
+    // Legacy single query support
+    return await executeSingleQuery(graph, workspaceId, parametersWithDefaults, accessToken, disableTimeRange)
+  } else {
+    throw new Error("Graph must have either 'query' or 'queries' defined")
+  }
+}
+
+/**
+ * Execute a single query (legacy support)
+ */
+async function executeSingleQuery(
+  graph: GraphFragmentData,
+  workspaceId: string,
+  parametersWithDefaults: Record<string, unknown>,
+  accessToken: string,
+  disableTimeRange: boolean
+): Promise<{ data: unknown[]; columns: string[] }> {
+  // Inject time range filter if configured in graph and not disabled
+  if (!graph.query) {
+    throw new Error("Graph query is required for single query execution")
+  }
+  let queryText = graph.query.text
+  if (graph.timeRange && !disableTimeRange) {
+    queryText = injectTimeRangeFilter(queryText, graph.timeRange)
+  }
+
   // Bind parameters to query safely
   const { bindParametersToQuery } = await import("./parameter-validation.service")
   const boundQuery = bindParametersToQuery(
-    graph.query.text,
+    queryText,
     graph.query.parameters || graph.parameterSchema.parameters,
     parametersWithDefaults
   )
 
-  // TODO: Call worker service connector API endpoint
-  // Worker service endpoint structure is TBD per plan (FR6)
-  // Example structure (TBD):
-  // const WORKER_SERVICE_URL = process.env.WORKER_SERVICE_URL || "http://localhost:3001"
-  // const response = await fetch(`${WORKER_SERVICE_URL}/connectors/${graph.connectorRef || graph.dataSourceRef}/execute`, {
-  //   method: "POST",
-  //   headers: {
-  //     "Authorization": `Bearer ${accessToken}`,
-  //     "Content-Type": "application/json",
-  //     "X-Workspace-Id": workspaceId,
-  //   },
-  //   body: JSON.stringify({
-  //     query: boundQuery.query,
-  //     parameters: boundQuery.parameterValues,
-  //     dataSourceRef: graph.dataSourceRef,
-  //     connectorRef: graph.connectorRef,
-  //   }),
-  // })
-  //
-  // if (!response.ok) {
-  //   const errorData = await response.json()
-  //   throw new Error(errorData.error || "Failed to execute query")
-  // }
-  //
-  // const result = await response.json()
-  // return {
-  //   data: result.data || [],
-  //   columns: result.columns || [],
-  // }
+  // Execute query directly using database exploration service
+  const result = await databaseExplorationService.executeQuery(
+    graph.dataSourceRef,
+    workspaceId,
+    boundQuery.query,
+    1, // page
+    1000, // pageSize (max for execution)
+    accessToken,
+    boundQuery.parameterValues // Pass pre-bound parameter values
+  )
 
-  // Mock response for MVP until worker service is ready
   return {
-    data: [],
-    columns: [],
+    data: result.rows,
+    columns: result.columns,
+  }
+}
+
+/**
+ * Combine multiple query results into a single dataset for visualization
+ * Aligns data by the first column (usually date) and prefixes numeric columns with refId
+ * Filters out hidden queries from visualization but keeps them for expression evaluation
+ */
+function combineQueryResults(
+  queryResults: Record<string, { data: unknown[]; columns: string[] }>,
+  queryDefinitions: Array<{ refId: string; name?: string; hidden?: boolean }>
+): { data: unknown[]; columns: string[] } {
+  // If no results, return empty
+  if (Object.keys(queryResults).length === 0) {
+    return { data: [], columns: [] }
+  }
+
+  // Filter out hidden queries from visualization (but keep them in queryResults for expressions)
+  const visibleQueryDefs = queryDefinitions.filter((def) => !def.hidden)
+  const visibleRefIds = new Set(visibleQueryDefs.map((def) => def.refId))
+  const visibleResultKeys = Object.keys(queryResults).filter((refId) => visibleRefIds.has(refId))
+
+  // If no visible results, return empty
+  if (visibleResultKeys.length === 0) {
+    return { data: [], columns: [] }
+  }
+
+  // Get date column from first visible result
+  const dateColumn = queryResults[visibleResultKeys[0]]?.columns[0]
+  if (!dateColumn) {
+    // Fallback: just return first visible result
+    return queryResults[visibleResultKeys[0]] || { data: [], columns: [] }
+  }
+
+  // Helper function to get display name for a column
+  const getColumnDisplayName = (refId: string, columnName: string, queryDef?: { name?: string }): string => {
+    const queryName = queryDef?.name
+    if (queryName) {
+      // Use custom name if provided
+      return queryName
+    }
+    // Fallback to refId_columnName
+    return `${refId}_${columnName}`
+  }
+
+  // If only one visible result, return it with prefixed columns
+  if (visibleResultKeys.length === 1) {
+    const refId = visibleResultKeys[0]
+    const result = queryResults[refId]
+    const queryDef = visibleQueryDefs.find((def) => def.refId === refId)
+    if (!result) {
+      return { data: [], columns: [] }
+    }
+    // Prefix numeric columns (all except first) with custom name or refId
+    const prefixedColumns = result.columns.map((col, index) => {
+      if (index === 0) return col // Keep first column as-is (usually date)
+      return getColumnDisplayName(refId, col, queryDef)
+    })
+    const prefixedData = result.data.map((row) => {
+      if (typeof row !== "object" || row === null) return row
+      const rowObj = row as Record<string, unknown>
+      const prefixedRow: Record<string, unknown> = {}
+      result.columns.forEach((col, index) => {
+        const newColName = index === 0 ? col : getColumnDisplayName(refId, col, queryDef)
+        prefixedRow[newColName] = rowObj[col]
+      })
+      return prefixedRow
+    })
+    return { data: prefixedData, columns: prefixedColumns }
+  }
+
+  // Multiple results - merge by aligning on first column (date)
+  // Collect all unique dates from visible queries only
+  const dateSet = new Set<string | number>()
+  for (const refId of visibleResultKeys) {
+    const result = queryResults[refId]
+    if (!result) continue
+    for (const row of result.data) {
+      if (typeof row === "object" && row !== null) {
+        const rowObj = row as Record<string, unknown>
+        const dateValue = rowObj[dateColumn]
+        if (dateValue !== null && dateValue !== undefined) {
+          dateSet.add(String(dateValue))
+        }
+      }
+    }
+  }
+
+  // Sort dates
+  const sortedDates = Array.from(dateSet).sort((a, b) => {
+    const aDate = new Date(String(a)).getTime()
+    const bDate = new Date(String(b)).getTime()
+    if (!Number.isNaN(aDate) && !Number.isNaN(bDate)) {
+      return aDate - bDate
+    }
+    return String(a).localeCompare(String(b))
+  })
+
+  // Build combined columns: date column + all numeric columns from visible queries only
+  const combinedColumns = [dateColumn]
+  for (const queryDef of visibleQueryDefs) {
+    const refId = queryDef.refId
+    const result = queryResults[refId]
+    if (!result) continue
+    // Add all columns except the first (date) with custom name or refId prefix
+    for (let i = 1; i < result.columns.length; i++) {
+      const col = result.columns[i]
+      combinedColumns.push(getColumnDisplayName(refId, col, queryDef))
+    }
+  }
+
+  // Build combined data by merging rows
+  const combinedData: unknown[] = []
+  for (const date of sortedDates) {
+    const combinedRow: Record<string, unknown> = { [dateColumn]: date }
+
+    // For each visible query, find the row matching this date
+    for (const queryDef of visibleQueryDefs) {
+      const refId = queryDef.refId
+      const result = queryResults[refId]
+      if (!result) continue
+
+      // Find row with matching date
+      const matchingRow = result.data.find((row) => {
+        if (typeof row === "object" && row !== null) {
+          const rowObj = row as Record<string, unknown>
+          return String(rowObj[dateColumn]) === String(date)
+        }
+        return false
+      })
+
+      if (matchingRow && typeof matchingRow === "object" && matchingRow !== null) {
+        const rowObj = matchingRow as Record<string, unknown>
+        // Copy all columns except the first (date) with custom name or refId prefix
+        for (let i = 1; i < result.columns.length; i++) {
+          const col = result.columns[i]
+          const displayName = getColumnDisplayName(refId, col, queryDef)
+          combinedRow[displayName] = rowObj[col]
+        }
+      } else {
+        // No matching row - fill with null
+        for (let i = 1; i < result.columns.length; i++) {
+          const col = result.columns[i]
+          const displayName = getColumnDisplayName(refId, col, queryDef)
+          combinedRow[displayName] = null
+        }
+      }
+    }
+
+    combinedData.push(combinedRow)
+  }
+
+  return { data: combinedData, columns: combinedColumns }
+}
+
+/**
+ * Execute multiple queries and expressions
+ */
+async function executeMultipleQueries(
+  graph: GraphFragmentData,
+  workspaceId: string,
+  parametersWithDefaults: Record<string, unknown>,
+  accessToken: string,
+  disableTimeRange: boolean
+): Promise<{ data: unknown[]; columns: string[] }> {
+  if (!graph.queries || graph.queries.length === 0) {
+    throw new Error("Graph queries are required for multiple query execution")
+  }
+  // Separate queries and expressions
+  const sqlQueries = graph.queries.filter((q) => "dialect" in q && q.dialect === "sql")
+  const expressions = graph.queries.filter((q) => "operation" in q)
+
+  // Execute all SQL queries first and store results by refId
+  const queryResults: Record<string, { data: unknown[]; columns: string[] }> = {}
+
+  for (const queryDef of sqlQueries) {
+    if ("dialect" in queryDef && queryDef.dialect === "sql") {
+      let queryText = queryDef.text
+
+      // Inject time range filter if configured and not disabled
+      if (graph.timeRange && !disableTimeRange) {
+        queryText = injectTimeRangeFilter(queryText, graph.timeRange)
+      }
+
+      // Bind parameters to query
+      const { bindParametersToQuery } = await import("./parameter-validation.service")
+      const boundQuery = bindParametersToQuery(queryText, queryDef.parameters, parametersWithDefaults)
+
+      // Execute query
+      const result = await databaseExplorationService.executeQuery(
+        queryDef.dataSourceRef || graph.dataSourceRef,
+        workspaceId,
+        boundQuery.query,
+        1,
+        1000,
+        accessToken,
+        boundQuery.parameterValues
+      )
+
+      queryResults[queryDef.refId] = {
+        data: result.rows,
+        columns: result.columns,
+      }
+    }
+  }
+
+  // Evaluate expressions
+  for (const exprDef of expressions) {
+    if ("operation" in exprDef) {
+      if (exprDef.operation === "math") {
+        const result = evaluateMathExpression(exprDef.expression, queryResults)
+        queryResults[exprDef.refId] = result
+      } else {
+        // TODO: Implement reduce and resample operations
+        throw new Error(`Expression operation '${exprDef.operation}' not yet implemented`)
+      }
+    }
+  }
+
+  // Combine all results for visualization
+  return combineQueryResults(queryResults, graph.queries)
+}
+
+/**
+ * Evaluate a math expression on query results
+ * Supports expressions like "$A + $B", "$A * 2", "$A - $B", etc.
+ * Aligns data by the first column (usually date) across all referenced queries
+ */
+function evaluateMathExpression(
+  expression: string,
+  queryResults: Record<string, { data: unknown[]; columns: string[] }>
+): { data: unknown[]; columns: string[] } {
+  // Extract referenced query IDs (e.g., $A, $B)
+  const refIdMatches = expression.match(/\$([A-Z])/g)
+  if (!refIdMatches || refIdMatches.length === 0) {
+    throw new Error(`Expression must reference at least one query: ${expression}`)
+  }
+
+  // Get unique refIds
+  const refIds = [...new Set(refIdMatches.map((m) => m.substring(1)))]
+
+  // Verify all referenced queries exist
+  for (const refId of refIds) {
+    if (!queryResults[refId]) {
+      throw new Error(`Query ${refId} not found for expression: ${expression}`)
+    }
+  }
+
+  // Get the first query result to determine date column and structure
+  const firstRefId = refIds[0]
+  if (!firstRefId) {
+    throw new Error("No reference IDs found in expression")
+  }
+  const firstResult = queryResults[firstRefId]
+  if (!firstResult) {
+    throw new Error(`Query result not found for ${firstRefId}`)
+  }
+
+  // The date column is always the first column
+  const dateColumn = firstResult.columns[0]
+  if (!dateColumn) {
+    throw new Error("First query must have at least one column (date)")
+  }
+
+  // Build a map of date -> values for each referenced query
+  // This allows us to align data by date even if queries have different dates or row counts
+  const dateValueMaps: Record<string, Record<string, number>> = {}
+
+  for (const refId of refIds) {
+    const result = queryResults[refId]
+    if (!result) {
+      throw new Error(`Query result not found for ${refId}`)
+    }
+
+    // Find the numeric column (first numeric column after date)
+    // PostgreSQL may return numeric values as strings, so we need to check and parse
+    let numericColumn: string | null = null
+
+    if (result.data.length === 0) {
+      throw new Error(`Query ${refId} returned no data for expression evaluation`)
+    }
+
+    // Check all columns after the date column
+    for (let i = 1; i < result.columns.length; i++) {
+      const col = result.columns[i]
+      // Check multiple rows to find a column with numeric data
+      for (const row of result.data) {
+        if (typeof row === "object" && row !== null) {
+          const rowObj = row as Record<string, unknown>
+          const value = rowObj[col]
+
+          // Check if it's already a number
+          if (typeof value === "number") {
+            numericColumn = col
+            break
+          }
+
+          // Check if it's a string that can be parsed as a number
+          if (typeof value === "string" && value.trim() !== "") {
+            const parsed = Number(value)
+            if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
+              numericColumn = col
+              break
+            }
+          }
+        }
+      }
+      if (numericColumn) break
+    }
+
+    if (!numericColumn) {
+      throw new Error(
+        `No numeric column found in query ${refId} for expression evaluation. Available columns: ${result.columns.join(", ")}`
+      )
+    }
+
+    // Build map: date -> numeric value
+    dateValueMaps[refId] = {}
+    for (const row of result.data) {
+      if (typeof row === "object" && row !== null) {
+        const rowObj = row as Record<string, unknown>
+        const dateValue = rowObj[dateColumn]
+        let numericValue = rowObj[numericColumn]
+
+        // Parse numeric value if it's a string
+        if (typeof numericValue === "string") {
+          const parsed = Number(numericValue)
+          if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
+            numericValue = parsed
+          } else {
+            continue // Skip rows with invalid numeric values
+          }
+        }
+
+        if (dateValue !== null && dateValue !== undefined && typeof numericValue === "number") {
+          dateValueMaps[refId][String(dateValue)] = numericValue
+        }
+      }
+    }
+  }
+
+  // Collect all unique dates from all referenced queries
+  const dateSet = new Set<string>()
+  for (const refId of refIds) {
+    const dateValueMap = dateValueMaps[refId]
+    if (dateValueMap) {
+      for (const date of Object.keys(dateValueMap)) {
+        dateSet.add(date)
+      }
+    }
+  }
+
+  // Sort dates
+  const sortedDates = Array.from(dateSet).sort((a, b) => {
+    const aDate = new Date(a).getTime()
+    const bDate = new Date(b).getTime()
+    if (!Number.isNaN(aDate) && !Number.isNaN(bDate)) {
+      return aDate - bDate
+    }
+    return String(a).localeCompare(String(b))
+  })
+
+  // Evaluate expression for each date
+  const evaluatedData: unknown[] = []
+
+  for (const date of sortedDates) {
+    // Replace $A, $B, etc. with actual values for this date
+    let evalExpr = expression
+    let allValuesPresent = true
+
+    for (const refId of refIds) {
+      const dateValueMap = dateValueMaps[refId]
+      const value = dateValueMap?.[date]
+      if (value === undefined) {
+        // Missing value for this date - skip this row or use null
+        allValuesPresent = false
+        break
+      }
+      evalExpr = evalExpr.replace(new RegExp(`\\$${refId}`, "g"), String(value))
+    }
+
+    // Only evaluate if all referenced queries have values for this date
+    if (allValuesPresent) {
+      try {
+        // Use Function constructor for safer evaluation
+        const result = new Function(`return ${evalExpr}`)()
+        evaluatedData.push({
+          [dateColumn]: date,
+          value: result,
+        })
+      } catch (error) {
+        // Log error but continue with other dates
+        console.error(
+          `Failed to evaluate expression for date ${date}: ${error instanceof Error ? error.message : "Unknown error"}`
+        )
+      }
+    }
+  }
+
+  return {
+    data: evaluatedData,
+    columns: [dateColumn, "value"],
+  }
+}
+
+/**
+ * Inject time range filter into SQL query
+ * Attempts to find date/timestamp columns and adds WHERE clause
+ */
+function injectTimeRangeFilter(
+  queryText: string,
+  timeRange: "1h" | "7d" | "30d" | "90d" | "180d" | "365d" | "all" | "custom"
+): string {
+  if (timeRange === "all" || timeRange === "custom") {
+    return queryText
+  }
+
+  // Common date/timestamp column names to look for
+  const dateColumnPatterns = [
+    /\bcreated_at\b/i,
+    /\bupdated_at\b/i,
+    /\bdate\b/i,
+    /\btimestamp\b/i,
+    /\bcreated\b/i,
+    /\bupdated\b/i,
+    /\btime\b/i,
+    /\bdatetime\b/i,
+  ]
+
+  // Try to find a date column in the SELECT clause
+  let dateColumn: string | null = null
+  const selectMatch = queryText.match(/SELECT\s+(.+?)\s+FROM/i)
+  if (selectMatch) {
+    const selectColumns = selectMatch[1]
+    for (const pattern of dateColumnPatterns) {
+      const match = selectColumns.match(pattern)
+      if (match) {
+        // Extract the column name (handle table aliases)
+        const columnMatch = selectColumns.match(new RegExp(`(?:\\w+\\.)?(${match[0]})`, "i"))
+        if (columnMatch) {
+          dateColumn = columnMatch[1]
+          break
+        }
+      }
+    }
+  }
+
+  // If no column found in SELECT, try common column names
+  if (!dateColumn) {
+    // Check if query references common date columns
+    for (const pattern of dateColumnPatterns) {
+      if (queryText.match(pattern)) {
+        const match = queryText.match(new RegExp(`(?:\\w+\\.)?(${pattern.source.replace(/\\b/g, "")})`, "i"))
+        if (match) {
+          dateColumn = match[1]
+          break
+        }
+      }
+    }
+  }
+
+  // Default to "created_at" if no column found
+  if (!dateColumn) {
+    dateColumn = "created_at"
+  }
+
+  // Calculate the date threshold
+  let dateThreshold: string
+  if (timeRange === "1h") {
+    dateThreshold = `NOW() - INTERVAL '1 hour'`
+  } else {
+    const days = parseInt(timeRange.replace("d", ""), 10)
+    dateThreshold = `NOW() - INTERVAL '${days} days'`
+  }
+
+  // Check if query already has a WHERE clause
+  const hasWhere = /\bWHERE\b/i.test(queryText)
+
+  // Build the time range filter
+  const timeFilter = `${dateColumn} >= ${dateThreshold}`
+
+  if (hasWhere) {
+    // Add to existing WHERE clause
+    return queryText.replace(/\bWHERE\b/i, `WHERE ${timeFilter} AND`)
+  } else {
+    // Add new WHERE clause before ORDER BY, GROUP BY, LIMIT, etc.
+    const orderByMatch = queryText.match(/\b(ORDER BY|GROUP BY|LIMIT|OFFSET)\b/i)
+    if (orderByMatch) {
+      const index = orderByMatch.index ?? queryText.length
+      return `${queryText.slice(0, index).trim()} WHERE ${timeFilter} ${queryText.slice(index)}`
+    } else {
+      return `${queryText.trim()} WHERE ${timeFilter}`
+    }
   }
 }
 
@@ -102,7 +613,8 @@ export async function executeQuery(
     connectorRef?: string
   },
   parameters: Record<string, unknown>,
-  accessToken: string
+  accessToken: string,
+  timeRange?: "1h" | "7d" | "30d" | "90d" | "180d" | "365d" | "all" | "custom"
 ): Promise<{ data: unknown[]; columns: string[] }> {
   // Apply default values for missing optional parameters
   const parametersWithDefaults: Record<string, unknown> = { ...parameters }
@@ -112,18 +624,128 @@ export async function executeQuery(
     }
   }
 
+  // Inject time range filter if provided
+  let queryText = graphData.query.text
+  if (timeRange) {
+    queryText = injectTimeRangeFilter(queryText, timeRange)
+  }
+
   // Bind parameters to query safely
   const { bindParametersToQuery } = await import("./parameter-validation.service")
-  const boundQuery = bindParametersToQuery(graphData.query.text, graphData.query.parameters, parametersWithDefaults)
+  const boundQuery = bindParametersToQuery(queryText, graphData.query.parameters, parametersWithDefaults)
 
-  // TODO: Call worker service connector API endpoint
-  // Worker service endpoint structure is TBD per plan (FR6)
-  // For now, return mock response
-  // Mock response for MVP until worker service is ready
+  // Execute query directly using database exploration service
+  // This uses the data source's connection to execute the query
+  const result = await databaseExplorationService.executeQuery(
+    graphData.dataSourceRef,
+    workspaceId,
+    boundQuery.query,
+    1, // page
+    1000, // pageSize (max for preview)
+    accessToken,
+    boundQuery.parameterValues // Pass pre-bound parameter values
+  )
+
   return {
-    data: [],
-    columns: [],
+    data: result.rows,
+    columns: result.columns,
   }
+}
+
+/**
+ * Execute multiple queries for preview (without a saved graph)
+ * Returns result data for visualization
+ */
+export async function executeMultipleQueriesPreview(
+  workspaceId: string,
+  graphData: {
+    queries: Array<
+      | {
+          refId: string
+          dialect: "sql"
+          text: string
+          dataSourceRef: string
+          parameters?: Array<{
+            name: string
+            type: string
+            required: boolean
+            default?: unknown
+          }>
+        }
+      | {
+          refId: string
+          operation: "math" | "reduce" | "resample"
+          expression: string
+        }
+    >
+    dataSourceRef: string // Default data source
+    connectorRef?: string
+  },
+  parameters: Record<string, unknown>,
+  accessToken: string,
+  timeRange?: "1h" | "7d" | "30d" | "90d" | "180d" | "365d" | "all" | "custom"
+): Promise<{ data: unknown[]; columns: string[] }> {
+  // Separate queries and expressions
+  const sqlQueries = graphData.queries.filter((q) => "dialect" in q && q.dialect === "sql")
+  const expressions = graphData.queries.filter((q) => "operation" in q)
+
+  // Execute all SQL queries first and store results by refId
+  const queryResults: Record<string, { data: unknown[]; columns: string[] }> = {}
+
+  for (const queryDef of sqlQueries) {
+    if ("dialect" in queryDef && queryDef.dialect === "sql") {
+      // Apply default values for missing optional parameters
+      const parametersWithDefaults: Record<string, unknown> = { ...parameters }
+      for (const paramDef of queryDef.parameters || []) {
+        if (parametersWithDefaults[paramDef.name] === undefined && paramDef.default !== undefined) {
+          parametersWithDefaults[paramDef.name] = paramDef.default
+        }
+      }
+
+      let queryText = queryDef.text
+
+      // Inject time range filter if provided
+      if (timeRange) {
+        queryText = injectTimeRangeFilter(queryText, timeRange)
+      }
+
+      // Bind parameters to query
+      const { bindParametersToQuery } = await import("./parameter-validation.service")
+      const boundQuery = bindParametersToQuery(queryText, queryDef.parameters || [], parametersWithDefaults)
+
+      // Execute query
+      const result = await databaseExplorationService.executeQuery(
+        queryDef.dataSourceRef || graphData.dataSourceRef,
+        workspaceId,
+        boundQuery.query,
+        1,
+        1000,
+        accessToken,
+        boundQuery.parameterValues
+      )
+
+      queryResults[queryDef.refId] = {
+        data: result.rows,
+        columns: result.columns,
+      }
+    }
+  }
+
+  // Evaluate expressions
+  for (const exprDef of expressions) {
+    if ("operation" in exprDef) {
+      if (exprDef.operation === "math") {
+        const result = evaluateMathExpression(exprDef.expression, queryResults)
+        queryResults[exprDef.refId] = result
+      } else {
+        // TODO: Implement reduce and resample operations
+        throw new Error(`Expression operation '${exprDef.operation}' not yet implemented`)
+      }
+    }
+  }
+
+  // Combine all results for visualization
+  return combineQueryResults(queryResults, graphData.queries)
 }
 
 /**

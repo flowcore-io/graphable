@@ -28,6 +28,35 @@ const parameterDefinitionSchema = z.object({
 export type ParameterDefinition = z.infer<typeof parameterDefinitionSchema>
 
 /**
+ * Query definition schema (SQL query)
+ */
+const queryDefinitionSchema = z.object({
+  refId: z.string().regex(/^[A-Z]$/, "refId must be a single uppercase letter (A-Z)"),
+  dialect: z.literal("sql"),
+  text: z.string().min(1, "Query text is required"),
+  dataSourceRef: z.string().min(1, "Data source reference is required"),
+  parameters: z.array(parameterDefinitionSchema),
+  name: z.string().optional(), // Custom display name for the query
+  hidden: z.boolean().optional().default(false), // Hide from visualization but still execute
+})
+
+/**
+ * Expression definition schema (math operations on queries)
+ */
+const expressionDefinitionSchema = z.object({
+  refId: z.string().regex(/^[A-Z]$/, "refId must be a single uppercase letter (A-Z)"),
+  operation: z.enum(["math", "reduce", "resample"]),
+  expression: z.string().min(1, "Expression is required"), // e.g., "$A + $B", "$A * 2"
+  name: z.string().optional(), // Custom display name for the expression
+  hidden: z.boolean().optional().default(false), // Hide from visualization but still execute
+})
+
+/**
+ * Query or expression union type
+ */
+const queryOrExpressionSchema = z.union([queryDefinitionSchema, expressionDefinitionSchema])
+
+/**
  * Zod schema for graph fragment content (stored in Usable fragment.content)
  *
  * ARCHITECTURAL NOTE:
@@ -39,13 +68,18 @@ export type ParameterDefinition = z.infer<typeof parameterDefinitionSchema>
 export const graphFragmentDataSchema = z.object({
   id: z.string().min(1, "ID is required"), // Sortable UUID (ULID) for the fragment
   title: z.string().min(1, "Title is required"), // Graph title/name - stored in JSON content (source of truth)
-  dataSourceRef: z.string().min(1, "Data source reference is required"),
+  dataSourceRef: z.string().min(1, "Data source reference is required"), // Default data source
   connectorRef: z.string().optional(),
-  query: z.object({
-    dialect: z.literal("sql"),
-    text: z.string().min(1, "Query text is required"),
-    parameters: z.array(parameterDefinitionSchema),
-  }),
+  // Support both single query (legacy) and multiple queries
+  query: z
+    .object({
+      dialect: z.literal("sql"),
+      text: z.string().min(1, "Query text is required"),
+      parameters: z.array(parameterDefinitionSchema),
+    })
+    .optional(),
+  // New: multiple queries and expressions
+  queries: z.array(queryOrExpressionSchema).min(1, "At least one query is required").optional(),
   parameterSchema: z.object({
     parameters: z.array(parameterDefinitionSchema),
   }),
@@ -53,6 +87,10 @@ export const graphFragmentDataSchema = z.object({
     type: z.enum(["line", "bar", "table", "pie", "scatter", "area"]),
     options: z.record(z.unknown()),
   }),
+  timeRange: z
+    .enum(["1h", "7d", "30d", "90d", "180d", "365d", "all", "custom"])
+    .optional()
+    .describe("Built-in time range filter for the graph"),
   cachePolicy: z
     .object({
       ttl: z.number().int().positive().optional(),
@@ -67,16 +105,24 @@ export type GraphFragmentData = z.infer<typeof graphFragmentDataSchema>
 
 /**
  * Zod schema for creating a graph
+ *
+ * NOTE: Removed .refine() to avoid Zod v4 schema serialization issues in Next.js/Turbopack.
+ * Validation for dataSourceRef is now done in the service layer (createGraph function).
  */
 export const createGraphInputSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  dataSourceRef: z.string().min(1, "Data source reference is required"),
+  dataSourceRef: z.string().optional(), // Optional when queries have their own dataSourceRef
   connectorRef: z.string().optional(),
-  query: z.object({
-    dialect: z.literal("sql"),
-    text: z.string().min(1, "Query text is required"),
-    parameters: z.array(parameterDefinitionSchema),
-  }),
+  // Support both single query (legacy) and multiple queries
+  query: z
+    .object({
+      dialect: z.literal("sql"),
+      text: z.string().min(1, "Query text is required"),
+      parameters: z.array(parameterDefinitionSchema),
+    })
+    .optional(),
+  // New: multiple queries and expressions
+  queries: z.array(queryOrExpressionSchema).min(1, "At least one query is required").optional(),
   parameterSchema: z.object({
     parameters: z.array(parameterDefinitionSchema),
   }),
@@ -84,6 +130,10 @@ export const createGraphInputSchema = z.object({
     type: z.enum(["line", "bar", "table", "pie", "scatter", "area"]),
     options: z.record(z.unknown()),
   }),
+  timeRange: z
+    .enum(["1h", "7d", "30d", "90d", "180d", "365d", "all", "custom"])
+    .optional()
+    .describe("Built-in time range filter for the graph"),
   cachePolicy: z
     .object({
       ttl: z.number().int().positive().optional(),
@@ -92,7 +142,7 @@ export const createGraphInputSchema = z.object({
 })
 
 /**
- * Graph creation input
+ * Graph creation input type (inferred from schema)
  */
 export type CreateGraphInput = z.infer<typeof createGraphInputSchema>
 
@@ -102,7 +152,7 @@ export type CreateGraphInput = z.infer<typeof createGraphInputSchema>
 export const updateGraphInputSchema = createGraphInputSchema.partial()
 
 /**
- * Graph update input
+ * Graph update input type (inferred from schema)
  */
 export type UpdateGraphInput = z.infer<typeof updateGraphInputSchema>
 
@@ -125,44 +175,96 @@ export async function createGraph(
   // Generate sortable UUID for the fragment content
   const fragmentContentUlid = ulid()
 
-  // Validate input data
-  const validatedData = createGraphInputSchema.parse(graphData)
+  // Input data is already validated in the API route, so we can use it directly
+  // Type assertion is safe because validation happened in the route handler
+  const validatedData = graphData as CreateGraphInput
+
+  // Validate and derive dataSourceRef (moved from .refine() to avoid serialization issues)
+  // If using single query (legacy), dataSourceRef is required
+  let finalDataSourceRef: string
+  if (validatedData.query && (!validatedData.queries || validatedData.queries.length === 0)) {
+    if (!validatedData.dataSourceRef || validatedData.dataSourceRef.trim().length === 0) {
+      throw new Error("Data source reference is required when using single query")
+    }
+    finalDataSourceRef = validatedData.dataSourceRef
+  } else if (validatedData.queries && validatedData.queries.length > 0) {
+    // If using multiple queries, derive dataSourceRef from first SQL query if not provided at top level
+    if (validatedData.dataSourceRef && validatedData.dataSourceRef.trim().length > 0) {
+      finalDataSourceRef = validatedData.dataSourceRef
+    } else {
+      // Find first SQL query with dataSourceRef
+      const firstSqlQuery = validatedData.queries.find(
+        (q) => "dialect" in q && q.dialect === "sql" && q.dataSourceRef && q.dataSourceRef.trim().length > 0
+      )
+      if (!firstSqlQuery || !("dataSourceRef" in firstSqlQuery) || !firstSqlQuery.dataSourceRef) {
+        throw new Error("Data source reference is required (either at top level or in each query)")
+      }
+      finalDataSourceRef = firstSqlQuery.dataSourceRef
+    }
+  } else {
+    // Fallback (should not happen due to schema validation)
+    throw new Error("Either 'query' or 'queries' must be provided")
+  }
 
   // Create fragment content with ULID
   // Title is stored in JSON content (source of truth)
   const fragmentContent: GraphFragmentData = {
     id: fragmentContentUlid,
     title: validatedData.title, // Title is in JSON content (source of truth)
-    dataSourceRef: validatedData.dataSourceRef,
+    dataSourceRef: finalDataSourceRef, // Now guaranteed to be a string
     connectorRef: validatedData.connectorRef,
     query: validatedData.query,
+    queries: validatedData.queries,
     parameterSchema: validatedData.parameterSchema,
     visualization: validatedData.visualization,
     cachePolicy: validatedData.cachePolicy,
   }
 
   // Validate the content structure
-  const validatedContent = graphFragmentDataSchema.parse(fragmentContent)
+  let validatedContent: GraphFragmentData
+  try {
+    validatedContent = graphFragmentDataSchema.parse(fragmentContent)
+  } catch (error) {
+    console.error("Graph fragment content validation failed:", {
+      error,
+      fragmentContent,
+      fragmentContentKeys: Object.keys(fragmentContent),
+    })
+    throw error
+  }
 
-  // Generate deterministic key for lookup (format: graph:<ulid>)
-  const fragmentKey = `graph:${fragmentContentUlid}`
+  // Generate deterministic key for lookup (format: graph-<ulid>)
+  // Note: Usable API requires keys to contain only alphanumeric characters, dashes, and underscores
+  const fragmentKey = `graph-${fragmentContentUlid}`
 
   // Create fragment in Usable
   // Sync title to fragment.title for Usable search convenience (content.title is source of truth)
-  const fragment = await usableApi.createFragment(
+  const fragmentInput = {
     workspaceId,
-    {
-      workspaceId,
-      title: validatedContent.title, // Sync from content for search
-      key: fragmentKey,
-      content: JSON.stringify(validatedContent, null, 2),
-      summary: `Graph: ${validatedContent.title}`,
-      tags: [GRAPHABLE_APP_TAG, "type:graph", `version:${GRAPHABLE_VERSION}`, `workspace:${workspaceId}`],
-      fragmentTypeId,
-      repository: "graphable",
+    title: validatedContent.title, // Sync from content for search
+    key: fragmentKey,
+    content: JSON.stringify(validatedContent, null, 2),
+    summary: `Graph: ${validatedContent.title}`,
+    tags: [GRAPHABLE_APP_TAG, "type:graph", `version:${GRAPHABLE_VERSION}`, `workspace:${workspaceId}`],
+    fragmentTypeId,
+    repository: "graphable",
+  }
+
+  console.log("Creating graph fragment:", {
+    workspaceId,
+    fragmentTypeId,
+    title: fragmentInput.title,
+    contentLength: fragmentInput.content.length,
+    hasQuery: !!validatedContent.query,
+    hasQueries: !!validatedContent.queries,
+    queriesCount: validatedContent.queries?.length || 0,
+    fragmentInput: {
+      ...fragmentInput,
+      content: fragmentInput.content.substring(0, 500) + "...", // Truncate for logging
     },
-    accessToken
-  )
+  })
+
+  const fragment = await usableApi.createFragment(workspaceId, fragmentInput, accessToken)
 
   // Use fragment ID as graph ID (no separate UUID)
   const graphId = fragment.id
@@ -175,7 +277,7 @@ export async function createGraph(
         graphId, // Fragment ID
         fragmentId: graphId, // Same as graphId
         workspaceId,
-        dataSourceRef: validatedData.dataSourceRef,
+        dataSourceRef: finalDataSourceRef, // Use validated/derived dataSourceRef
         connectorRef: validatedData.connectorRef,
         occurredAt: new Date().toISOString(),
         initiatedBy: (sessionPathway as any).getUserResolver
@@ -216,8 +318,9 @@ export async function updateGraph(
     throw new Error(`Invalid graph fragment content: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 
-  // Validate update input
-  const validatedUpdate = updateGraphInputSchema.parse(graphData)
+  // Input data is already validated in the API route, so we can use it directly
+  // Type assertion is safe because validation happened in the route handler
+  const validatedUpdate = graphData as UpdateGraphInput
 
   // Full content replacement: merge updates, preserving the ID
   // Title is stored in JSON content (source of truth)
@@ -227,7 +330,8 @@ export async function updateGraph(
     dataSourceRef:
       validatedUpdate.dataSourceRef !== undefined ? validatedUpdate.dataSourceRef : existingData.dataSourceRef,
     connectorRef: validatedUpdate.connectorRef !== undefined ? validatedUpdate.connectorRef : existingData.connectorRef,
-    query: validatedUpdate.query || existingData.query,
+    query: validatedUpdate.query !== undefined ? validatedUpdate.query : existingData.query,
+    queries: validatedUpdate.queries !== undefined ? validatedUpdate.queries : existingData.queries,
     parameterSchema: validatedUpdate.parameterSchema || existingData.parameterSchema,
     visualization: validatedUpdate.visualization || existingData.visualization,
     cachePolicy: validatedUpdate.cachePolicy !== undefined ? validatedUpdate.cachePolicy : existingData.cachePolicy,

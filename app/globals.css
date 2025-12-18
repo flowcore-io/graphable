@@ -165,3 +165,12 @@
     letter-spacing: -0.02em;
   }
 }
+
+/* Gridstack overrides */
+.grid-stack-item-content {
+  overflow: visible !important;
+}
+
+.grid-stack > .grid-stack-item > .grid-stack-item-content {
+  inset: 0px !important;
+}

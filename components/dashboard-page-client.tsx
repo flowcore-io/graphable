@@ -2,11 +2,12 @@
 
 import { DashboardEditor } from "@/components/dashboard-editor"
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import type { DashboardFragmentData, DashboardWithMetadata } from "@/lib/services/dashboard.service"
+import { cn } from "@/lib/utils"
 import { ArrowLeftIcon, EyeIcon, MoreVerticalIcon, PencilIcon, TrashIcon } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -60,6 +61,30 @@ export function DashboardPageClient({ dashboard, dashboardId, workspaceId, works
 
     setIsSaving(true)
     try {
+      // Validate layout structure before sending
+      if (!layout || !layout.grid || typeof layout.grid.columns !== "number" || typeof layout.grid.rows !== "number") {
+        throw new Error("Invalid layout structure: grid.columns and grid.rows are required")
+      }
+
+      if (!Array.isArray(layout.tiles)) {
+        throw new Error("Invalid layout structure: tiles must be an array")
+      }
+
+      // Validate each tile has required fields
+      for (const tile of layout.tiles) {
+        if (!tile.graphRef || !tile.position) {
+          throw new Error(`Invalid tile structure: graphRef and position are required for tile ${JSON.stringify(tile)}`)
+        }
+        if (
+          typeof tile.position.x !== "number" ||
+          typeof tile.position.y !== "number" ||
+          typeof tile.position.w !== "number" ||
+          typeof tile.position.h !== "number"
+        ) {
+          throw new Error(`Invalid tile position: x, y, w, h must be numbers for tile ${tile.graphRef}`)
+        }
+      }
+
       const response = await fetch(`/api/dashboards/${dashboardId}`, {
         method: "PUT",
         headers: {
@@ -74,7 +99,11 @@ export function DashboardPageClient({ dashboard, dashboardId, workspaceId, works
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to save dashboard")
+        console.error("Dashboard save error:", errorData)
+        const errorMessage = errorData.details
+          ? `${errorData.error}: ${JSON.stringify(errorData.details, null, 2)}`
+          : errorData.error || "Failed to save dashboard"
+        throw new Error(errorMessage)
       }
 
       // Refresh to get updated dashboard
@@ -156,11 +185,9 @@ export function DashboardPageClient({ dashboard, dashboardId, workspaceId, works
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" asChild>
-                <Link href="/dashboards">
-                  <ArrowLeftIcon className="h-4 w-4" />
-                </Link>
-              </Button>
+              <Link href="/dashboards" className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
+                <ArrowLeftIcon className="h-4 w-4" />
+              </Link>
               <div className="min-w-0">
                 {isEditing && isEditingTitle ? (
                   <Input
@@ -202,37 +229,35 @@ export function DashboardPageClient({ dashboard, dashboardId, workspaceId, works
               {dashboard && (
                 <>
                   <Button
-                    variant={isEditing ? "outline" : "default"}
+                    variant={isEditing ? "default" : "outline"}
                     onClick={() => setIsEditing(!isEditing)}
                     disabled={isSaving}
                   >
                     {isEditing ? (
                       <>
-                        <EyeIcon className="h-4 w-4 mr-2" />
-                        View Mode
+                        <PencilIcon className="h-4 w-4 mr-2" />
+                        Edit Mode
                       </>
                     ) : (
                       <>
-                        <PencilIcon className="h-4 w-4 mr-2" />
-                        Edit Mode
+                        <EyeIcon className="h-4 w-4 mr-2" />
+                        View Mode
                       </>
                     )}
                   </Button>
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon">
-                        <MoreVerticalIcon className="h-4 w-4" />
-                        <span className="sr-only">Dashboard actions</span>
-                      </Button>
+                    <DropdownMenuTrigger className={buttonVariants({ variant: "outline", size: "icon" })}>
+                      <MoreVerticalIcon className="h-4 w-4" />
+                      <span className="sr-only">Dashboard actions</span>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
+                      <DropdownMenuItem>
                         <Link href={`/dashboards/${dashboardId}/edit`} className="flex items-center">
                           <PencilIcon className="h-4 w-4 mr-2" />
                           Edit Dashboard
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
+                      <DropdownMenuItem>
                         <Link
                           href={`/dashboards/${dashboardId}/delete`}
                           className="flex items-center text-destructive focus:text-destructive"
@@ -269,9 +294,9 @@ export function DashboardPageClient({ dashboard, dashboardId, workspaceId, works
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <p className="text-muted-foreground">Dashboard not found</p>
-                <Button variant="outline" className="mt-4" asChild>
-                  <Link href="/dashboards">Back to Dashboards</Link>
-                </Button>
+                <Link href="/dashboards" className={cn(buttonVariants({ variant: "outline" }), "mt-4")}>
+                  Back to Dashboards
+                </Link>
               </CardContent>
             </Card>
           )
@@ -281,9 +306,9 @@ export function DashboardPageClient({ dashboard, dashboardId, workspaceId, works
             <p className="text-muted-foreground mb-6 max-w-md">
               You need to link a Usable workspace to get started with Graphable.
             </p>
-            <Button asChild>
-              <Link href="/onboarding/link-workspace">Link Workspace</Link>
-            </Button>
+            <Link href="/onboarding/link-workspace" className={cn(buttonVariants())}>
+              Link Workspace
+            </Link>
           </div>
         )}
       </main>

@@ -11,32 +11,69 @@ export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
 /**
- * Schema for creating a graph
+ * Schema for creating a graph - defined inline to avoid module import issues
+ * This is a copy of createGraphInputSchema from graph.service.ts
  */
-const createGraphSchema = z.object({
+const createGraphInputSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  dataSourceRef: z.string().min(1, "Data source reference is required"),
+  dataSourceRef: z.string().optional(),
   connectorRef: z.string().optional(),
-  query: z.object({
-    dialect: z.literal("sql"),
-    text: z.string().min(1, "Query text is required"),
-    parameters: z.array(
-      z.object({
-        name: z.string(),
-        type: z.enum(["string", "number", "boolean", "date", "timestamp", "enum", "string[]", "number[]"]),
-        required: z.boolean(),
-        default: z.unknown().optional(),
-        enumValues: z.array(z.string()).optional(),
-        min: z.number().optional(),
-        max: z.number().optional(),
-        pattern: z.string().optional(),
-      })
-    ),
-  }),
+  query: z
+    .object({
+      dialect: z.literal("sql"),
+      text: z.string().min(1, "Query text is required"),
+      parameters: z.array(
+        z.object({
+          name: z.string().min(1, "Parameter name is required"),
+          type: z.enum(["string", "number", "boolean", "date", "timestamp", "enum", "string[]", "number[]"]),
+          required: z.boolean(),
+          default: z.unknown().optional(),
+          enumValues: z.array(z.string()).optional(),
+          min: z.number().optional(),
+          max: z.number().optional(),
+          pattern: z.string().optional(),
+        })
+      ),
+    })
+    .optional(),
+  queries: z
+    .array(
+      z.union([
+        z.object({
+          refId: z.string().regex(/^[A-Z]$/, "refId must be a single uppercase letter (A-Z)"),
+          dialect: z.literal("sql"),
+          text: z.string().min(1, "Query text is required"),
+          dataSourceRef: z.string().min(1, "Data source reference is required"),
+          parameters: z.array(
+            z.object({
+              name: z.string().min(1, "Parameter name is required"),
+              type: z.enum(["string", "number", "boolean", "date", "timestamp", "enum", "string[]", "number[]"]),
+              required: z.boolean(),
+              default: z.unknown().optional(),
+              enumValues: z.array(z.string()).optional(),
+              min: z.number().optional(),
+              max: z.number().optional(),
+              pattern: z.string().optional(),
+            })
+          ),
+          name: z.string().optional(),
+          hidden: z.boolean().optional().default(false),
+        }),
+        z.object({
+          refId: z.string().regex(/^[A-Z]$/, "refId must be a single uppercase letter (A-Z)"),
+          operation: z.enum(["math", "reduce", "resample"]),
+          expression: z.string().min(1, "Expression is required"),
+          name: z.string().optional(),
+          hidden: z.boolean().optional().default(false),
+        }),
+      ])
+    )
+    .min(1, "At least one query is required")
+    .optional(),
   parameterSchema: z.object({
     parameters: z.array(
       z.object({
-        name: z.string(),
+        name: z.string().min(1, "Parameter name is required"),
         type: z.enum(["string", "number", "boolean", "date", "timestamp", "enum", "string[]", "number[]"]),
         required: z.boolean(),
         default: z.unknown().optional(),
@@ -51,9 +88,10 @@ const createGraphSchema = z.object({
     type: z.enum(["line", "bar", "table", "pie", "scatter", "area"]),
     options: z.record(z.unknown()),
   }),
+  timeRange: z.enum(["1h", "7d", "30d", "90d", "180d", "365d", "all", "custom"]).optional(),
   cachePolicy: z
     .object({
-      ttl: z.number().optional(),
+      ttl: z.number().int().positive().optional(),
     })
     .optional(),
 })
@@ -91,7 +129,9 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) =
 
     // Parse and validate request body
     const body = await req.json()
-    const validationResult = createGraphSchema.safeParse(body)
+
+    // Validate request body using schema
+    const validationResult = createGraphInputSchema.safeParse(body)
 
     if (!validationResult.success) {
       return NextResponse.json(

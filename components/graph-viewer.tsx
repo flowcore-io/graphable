@@ -1,35 +1,12 @@
 "use client"
 
+import { GraphChart } from "@/components/graph-chart"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import {
-  type ChartConfig,
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import type { GraphWithMetadata } from "@/lib/services/graph.service"
 import { AlertCircleIcon } from "lucide-react"
-import { useEffect, useState } from "react"
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  Scatter,
-  ScatterChart,
-  XAxis,
-  YAxis,
-} from "recharts"
+import { useEffect, useRef, useState } from "react"
 
 interface GraphViewerProps {
   graph: GraphWithMetadata
@@ -50,6 +27,7 @@ export function GraphViewer({ graph, workspaceId, parameters = {} }: GraphViewer
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const previousParametersRef = useRef<string>("")
 
   useEffect(() => {
     async function loadGraphData() {
@@ -57,6 +35,16 @@ export function GraphViewer({ graph, workspaceId, parameters = {} }: GraphViewer
         setIsLoading(false)
         return
       }
+
+      // Serialize parameters to compare with previous value
+      const parametersKey = JSON.stringify(parameters)
+
+      // Skip if parameters haven't actually changed
+      if (parametersKey === previousParametersRef.current && previousParametersRef.current !== "") {
+        return
+      }
+
+      previousParametersRef.current = parametersKey
 
       setIsLoading(true)
       setError(null)
@@ -88,8 +76,6 @@ export function GraphViewer({ graph, workspaceId, parameters = {} }: GraphViewer
     }
 
     loadGraphData()
-    // Note: parameters intentionally excluded from deps to avoid re-executing on every parameter change
-    // The component should be re-rendered by parent when parameters change
   }, [graph.fragmentId, workspaceId, parameters])
 
   if (isLoading) {
@@ -118,155 +104,48 @@ export function GraphViewer({ graph, workspaceId, parameters = {} }: GraphViewer
 
   const { data, columns } = executionResult
 
-  // Prepare chart config from visualization options
-  const chartConfig: ChartConfig = {}
-  const colors = (graph.visualization.options?.colors as string[]) || [
-    "#8884d8",
-    "#82ca9d",
-    "#ffc658",
-    "#ff7300",
-    "#00ff00",
-  ]
-
-  // Build chart config from columns
-  columns.forEach((col, index) => {
-    chartConfig[col] = {
-      label: col,
-      color: colors[index % colors.length],
-    }
-  })
-
-  // Render based on visualization type
-  switch (graph.visualization.type) {
-    case "table":
-      return (
-        <div className="overflow-auto max-h-64">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {columns.map((col) => (
-                  <TableHead key={col}>{col}</TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(data as Record<string, unknown>[]).slice(0, 10).map((row, index) => {
-                const rowKey = `${String(row[columns[0]] ?? "")}-${index}`
-                return (
-                  <TableRow key={rowKey}>
-                    {columns.map((col) => (
-                      <TableCell key={col}>{String(row[col] ?? "")}</TableCell>
-                    ))}
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )
-
-    case "line":
-      return (
-        <ChartContainer config={chartConfig} className="h-64">
-          <LineChart data={data as Record<string, unknown>[]}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey={columns[0]} />
-            <YAxis />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <ChartLegend content={<ChartLegendContent />} />
-            {columns.slice(1).map((col) => {
-              const index = columns.indexOf(col) - 1
+  // Render table separately as it doesn't use the chart component
+  if (graph.visualization.type === "table") {
+    return (
+      <div className="overflow-auto max-h-64">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {columns.map((col) => (
+                <TableHead key={col}>{col}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {(data as Record<string, unknown>[]).slice(0, 10).map((row, index) => {
+              const rowKey = `${String(row[columns[0]] ?? "")}-${index}`
               return (
-                <Line key={col} type="monotone" dataKey={col} stroke={colors[index % colors.length]} strokeWidth={2} />
+                <TableRow key={rowKey}>
+                  {columns.map((col) => (
+                    <TableCell key={col}>{String(row[col] ?? "")}</TableCell>
+                  ))}
+                </TableRow>
               )
             })}
-          </LineChart>
-        </ChartContainer>
-      )
-
-    case "bar":
-      return (
-        <ChartContainer config={chartConfig} className="h-64">
-          <BarChart data={data as Record<string, unknown>[]}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey={columns[0]} />
-            <YAxis />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <ChartLegend content={<ChartLegendContent />} />
-            {columns.slice(1).map((col) => {
-              const index = columns.indexOf(col) - 1
-              return <Bar key={col} dataKey={col} fill={colors[index % colors.length]} />
-            })}
-          </BarChart>
-        </ChartContainer>
-      )
-
-    case "pie": {
-      // Pie chart uses first column as name, second as value
-      const pieData = (data as Record<string, unknown>[]).map((row) => ({
-        name: String(row[columns[0]] ?? ""),
-        value: Number(row[columns[1]] ?? 0),
-      }))
-      return (
-        <ChartContainer config={chartConfig} className="h-64">
-          <PieChart>
-            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-              {pieData.map((item) => {
-                const index = pieData.indexOf(item)
-                return <Cell key={`cell-${item.name}-${index}`} fill={colors[index % colors.length]} />
-              })}
-            </Pie>
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <ChartLegend content={<ChartLegendContent />} />
-          </PieChart>
-        </ChartContainer>
-      )
-    }
-
-    case "scatter":
-      return (
-        <ChartContainer config={chartConfig} className="h-64">
-          <ScatterChart data={data as Record<string, unknown>[]}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey={columns[0]} />
-            <YAxis dataKey={columns[1]} />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <Scatter dataKey={columns[1]} fill={colors[0]} />
-          </ScatterChart>
-        </ChartContainer>
-      )
-
-    case "area":
-      return (
-        <ChartContainer config={chartConfig} className="h-64">
-          <AreaChart data={data as Record<string, unknown>[]}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey={columns[0]} />
-            <YAxis />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <ChartLegend content={<ChartLegendContent />} />
-            {columns.slice(1).map((col) => {
-              const index = columns.indexOf(col) - 1
-              return (
-                <Area
-                  key={col}
-                  type="monotone"
-                  dataKey={col}
-                  stroke={colors[index % colors.length]}
-                  fill={colors[index % colors.length]}
-                  fillOpacity={0.6}
-                />
-              )
-            })}
-          </AreaChart>
-        </ChartContainer>
-      )
-
-    default:
-      return (
-        <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
-          Unsupported visualization type: {graph.visualization.type}
-        </div>
-      )
+          </TableBody>
+        </Table>
+      </div>
+    )
   }
+
+  // Use the reusable GraphChart component for all chart types
+  const visualizationOptions =
+    typeof graph.visualization.options === "string"
+      ? graph.visualization.options
+      : JSON.stringify(graph.visualization.options || {})
+
+  return (
+    <GraphChart
+      data={data as Record<string, unknown>[]}
+      columns={columns}
+      visualizationType={graph.visualization.type}
+      visualizationOptions={visualizationOptions}
+      className="h-full w-full"
+    />
+  )
 }

@@ -132,7 +132,7 @@ async function createBaseConfigFragments(workspaceId: string, accessToken: strin
     tags: [GRAPHABLE_APP_TAG, "type:tenant-config", `version:${GRAPHABLE_VERSION}`],
     fragmentTypeId: "04a5fb62-1ba5-436c-acf7-f65f3a5ba6f6", // Knowledge type
     repository: "graphable",
-    key: "graphable:tenant-config", // Deterministic key for singleton lookup
+    key: "graphable-tenant-config", // Deterministic key for singleton lookup (dash instead of colon per Usable API requirements)
   }
 
   // Instruction Set (type: instruction set)

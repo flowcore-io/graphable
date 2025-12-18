@@ -291,7 +291,11 @@ export function GraphCreationModal({
                         aria-invalid={!!errors.dataSourceRef}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a data source" />
+                          <SelectValue placeholder="Select a data source">
+                            {dataSourceRef
+                              ? dataSources.find((ds) => ds.fragmentId === dataSourceRef)?.name || dataSourceRef
+                              : "Select a data source"}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {dataSources.length === 0 ? (

@@ -1,5 +1,6 @@
 "use client"
 
+import { DashboardGridstack } from "@/components/dashboard-gridstack"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,10 +11,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Card, CardContent } from "@/components/ui/card"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { DashboardFragmentData } from "@/lib/services/dashboard.service"
-import { MoreVerticalIcon, TrashIcon } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 
 interface DashboardLayoutProps {
@@ -24,10 +23,12 @@ interface DashboardLayoutProps {
 
 /**
  * Dashboard layout component
- * Renders dashboard grid layout with graph tiles and supports CRUD operations
+ * Renders dashboard grid layout with graph tiles using saved positions and sizes
+ * Uses Gridstack for consistent layout rendering (completely static in view mode)
  */
 export function DashboardLayout({ dashboard, dashboardId, workspaceId }: DashboardLayoutProps) {
-  const [deleteTileIndex, setDeleteTileIndex] = useState<number | null>(null)
+  const router = useRouter()
+  const [deleteTileId, setDeleteTileId] = useState<string | null>(null)
   const [isDeletingTile, setIsDeletingTile] = useState(false)
 
   // Ensure layout exists with default structure if missing
@@ -39,10 +40,10 @@ export function DashboardLayout({ dashboard, dashboardId, workspaceId }: Dashboa
     tiles: [],
   }
 
-  const handleDeleteTile = async (tileIndex: number) => {
+  const handleDeleteTile = async (graphRef: string) => {
     setIsDeletingTile(true)
     try {
-      const updatedTiles = layout.tiles.filter((_, index) => index !== tileIndex)
+      const updatedTiles = layout.tiles.filter((tile) => tile.graphRef !== graphRef)
 
       const response = await fetch(`/api/dashboards/${dashboardId}`, {
         method: "PUT",
@@ -65,7 +66,7 @@ export function DashboardLayout({ dashboard, dashboardId, workspaceId }: Dashboa
       }
 
       router.refresh()
-      setDeleteTileIndex(null)
+      setDeleteTileId(null)
     } catch (error) {
       console.error("Failed to delete tile:", error)
       alert(error instanceof Error ? error.message : "Failed to remove graph from dashboard")
@@ -81,15 +82,13 @@ export function DashboardLayout({ dashboard, dashboardId, workspaceId }: Dashboa
       </div>
 
       {layout.tiles.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground">No graphs added to this dashboard yet</p>
-            <p className="text-sm text-muted-foreground mt-2">Switch to edit mode to add graphs</p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-muted-foreground/20 rounded-lg">
+          <p className="text-muted-foreground mb-2">No graphs added to this dashboard yet</p>
+          <p className="text-sm text-muted-foreground">Switch to edit mode to add graphs</p>
+        </div>
       ) : (
         <>
-          <AlertDialog open={deleteTileIndex !== null} onOpenChange={(open) => !open && setDeleteTileIndex(null)}>
+          <AlertDialog open={deleteTileId !== null} onOpenChange={(open) => !open && setDeleteTileId(null)}>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Remove Graph from Dashboard</AlertDialogTitle>
@@ -100,7 +99,11 @@ export function DashboardLayout({ dashboard, dashboardId, workspaceId }: Dashboa
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={isDeletingTile}>Cancel</AlertDialogCancel>
                 <AlertDialogAction
-                  onClick={() => deleteTileIndex !== null && handleDeleteTile(deleteTileIndex)}
+                  onClick={() => {
+                    if (deleteTileId !== null) {
+                      handleDeleteTile(deleteTileId)
+                    }
+                  }}
                   disabled={isDeletingTile}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
@@ -110,50 +113,14 @@ export function DashboardLayout({ dashboard, dashboardId, workspaceId }: Dashboa
             </AlertDialogContent>
           </AlertDialog>
 
-          <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${layout.grid.columns}, minmax(0, 1fr))` }}>
-            {layout.tiles.map((tile, index) => (
-              <Card
-                key={tile.graphRef}
-                style={{
-                  gridColumn: `span ${tile.position.w}`,
-                  gridRow: `span ${tile.position.h}`,
-                }}
-                className="relative group"
-              >
-                <CardContent className="p-4">
-                  <div className="h-full flex flex-col">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm font-medium">Graph: {tile.graphRef.slice(0, 8)}...</p>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <MoreVerticalIcon className="h-4 w-4" />
-                            <span className="sr-only">Graph actions</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => setDeleteTileIndex(index)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <TrashIcon className="h-4 w-4 mr-2" />
-                            Remove from Dashboard
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <div className="flex items-center justify-center flex-1 bg-muted rounded-md">
-                      <p className="text-xs text-muted-foreground">Graph tile placeholder</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <DashboardGridstack
+            tiles={layout.tiles}
+            isEditing={false}
+            workspaceId={workspaceId}
+            dashboardId={dashboardId}
+            onDeleteTile={(id) => setDeleteTileId(id)}
+            onEditTile={(id) => router.push(`/dashboards/${dashboardId}/graphs/${id}/edit`)}
+          />
         </>
       )}
     </div>

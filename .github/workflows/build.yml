@@ -77,8 +77,11 @@ jobs:
         with:
           cmd: yq --version
       - name: Update Image Version in the related HelmChart production configuration file
+        env:
+          TAG_PATH: ${{ needs.extract_info.outputs.tagPath }}
+          VERSION: ${{ needs.extract_info.outputs.version }}
         run: |
-          yq -i '.${{ needs.extract_info.outputs.tagPath }} = "${{ needs.extract_info.outputs.version }}"' manifest/configuration/azure-eu.yaml
+          yq eval ".${TAG_PATH} = \"${VERSION}\"" -i manifest/configuration/azure-eu.yaml
       - name: Commit the changes
         run: |
           cd manifest

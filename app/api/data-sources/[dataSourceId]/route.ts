@@ -26,7 +26,8 @@ const updateDataSourceSchema = z.object({
     })
     .optional(),
   secretPayload: z.string().min(1).optional(),
-  // secretName removed - secret name cannot be updated, only the value
+  // secretName: optional, required only when creating a new secret if reference is missing
+  secretName: z.string().min(1).optional(),
 })
 
 /**

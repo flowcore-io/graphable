@@ -333,12 +333,13 @@ export default function DataSourceViewPage() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          queryResult.rows.map((row, rowIdx) => (
+                          (queryResult.rows as Record<string, unknown>[]).map((row, rowIdx) => (
                             <TableRow key={rowIdx}>
                               {queryResult.columns.map((col) => (
                                 <TableCell key={col} className="font-mono text-xs">
-                                  {row[col as keyof typeof row] !== null && row[col as keyof typeof row] !== undefined
-                                    ? String(row[col as keyof typeof row])
+                                  {(row as Record<string, unknown>)[col] !== null &&
+                                  (row as Record<string, unknown>)[col] !== undefined
+                                    ? String((row as Record<string, unknown>)[col])
                                     : "NULL"}
                                 </TableCell>
                               ))}
@@ -357,8 +358,3 @@ export default function DataSourceViewPage() {
     </div>
   )
 }
-
-
-
-
-

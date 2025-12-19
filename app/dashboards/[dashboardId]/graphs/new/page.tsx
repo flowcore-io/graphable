@@ -622,7 +622,7 @@ function NewGraphPageContent() {
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select visualization type" />
+                          <SelectValue>Select visualization type</SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="table">Table</SelectItem>
@@ -661,7 +661,3 @@ export default function NewGraphPage() {
     </GraphEditorProvider>
   )
 }
-
-
-
-

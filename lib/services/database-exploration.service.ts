@@ -408,7 +408,7 @@ export async function executeQuery(
     }
 
     // Extract column names from result (only for SELECT queries)
-    const columns = result.fields ? result.fields.map((field) => field.name) : []
+    const columns = result.fields ? result.fields.map((field: { name: string }) => field.name) : []
 
     // If we couldn't get count for SELECT queries, estimate it (not accurate but better than nothing)
     if (!canCount && isSelectQuery) {
@@ -445,7 +445,3 @@ export async function isWorkspaceAdmin(workspaceId: string, userId: string, acce
   // This will need to be implemented when Usable API provides workspace role endpoints
   return false
 }
-
-
-
-

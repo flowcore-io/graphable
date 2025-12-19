@@ -102,8 +102,10 @@ export const updateDataSourceInputSchema = z.object({
         .optional(),
     })
     .optional(),
-  // Optional secret update (only payload, name cannot be changed)
+  // Optional secret update (only payload, name cannot be changed if secret exists)
   secretPayload: z.string().min(1).optional(),
+  // Optional secret name (required only when creating a new secret if reference is missing)
+  secretName: z.string().min(1).optional(),
 })
 
 /**
@@ -237,7 +239,7 @@ export async function updateDataSource(
   // Validate update input
   const validatedUpdate = updateDataSourceInputSchema.parse(dataSourceData)
 
-  // Update secret if provided (only payload, name cannot be changed)
+  // Update secret if provided (only payload, name cannot be changed if secret exists)
   let secretRef: SecretReference | undefined
   if (validatedUpdate.secretPayload) {
     const secretProvider = getSecretProvider()
@@ -262,8 +264,22 @@ export async function updateDataSource(
         })
         .where(eq(dataSourceSecrets.dataSourceId, dataSourceId))
     } else {
-      // Cannot create new secret without name - this should not happen in edit flow
-      throw new Error("Cannot update secret: secret reference not found. Secret name is required for new secrets.")
+      // Secret reference not found - create new secret if name is provided
+      if (!validatedUpdate.secretName) {
+        throw new Error(
+          "Cannot create secret: secret reference not found and secret name is required to create a new secret."
+        )
+      }
+
+      // Create new secret with provided name
+      secretRef = await secretProvider.putSecret(workspaceId, validatedUpdate.secretName, validatedUpdate.secretPayload)
+
+      // Store secret reference in database
+      await db.insert(dataSourceSecrets).values({
+        dataSourceId,
+        workspaceId,
+        secretRef: secretRef as unknown as Record<string, unknown>,
+      })
     }
   }
 
@@ -393,6 +409,19 @@ export interface MaskedConnectionDetails {
   user: string
   sslMode?: string
   connectionString: string // Masked connection string (password hidden)
+}
+
+/**
+ * Connection details (includes actual password for editing)
+ */
+export interface ConnectionDetails {
+  host: string
+  port: number
+  database: string
+  user: string
+  password: string // Actual password (needed for editing)
+  sslMode: string
+  connectionString: string // Actual connection string (not masked)
 }
 
 /**
@@ -848,8 +877,3 @@ export async function testDataSourceConnection(
     })
   }
 }
-
-
-
-
-

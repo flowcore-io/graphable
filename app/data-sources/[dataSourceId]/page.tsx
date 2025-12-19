@@ -414,13 +414,11 @@ export default function DataSourceViewPage() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          queryResult.rows.map((row, rowIdx) => (
+                          (queryResult.rows as Record<string, unknown>[]).map((row, rowIdx) => (
                             <TableRow key={`row-${rowIdx}-${queryResult.page}`}>
                               {queryResult.columns.map((col) => (
                                 <TableCell key={col} className="font-mono text-xs">
-                                  {row[col as keyof typeof row] !== null && row[col as keyof typeof row] !== undefined
-                                    ? String(row[col as keyof typeof row])
-                                    : "NULL"}
+                                  {row[col] !== null && row[col] !== undefined ? String(row[col]) : "NULL"}
                                 </TableCell>
                               ))}
                             </TableRow>

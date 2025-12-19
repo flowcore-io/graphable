@@ -555,11 +555,11 @@ function EditGraphPageContent() {
                       ) : (
                         <Select
                           value={dataSourceRef}
-                          onValueChange={(value) => setValue("dataSourceRef", value)}
+                          onValueChange={(value) => setValue("dataSourceRef", value || "")}
                           aria-invalid={!!errors.dataSourceRef}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a data source">
+                            <SelectValue>
                               {dataSourceRef
                                 ? dataSources.find((ds) => ds.fragmentId === dataSourceRef)?.name || dataSourceRef
                                 : "Select a data source"}
@@ -603,7 +603,7 @@ function EditGraphPageContent() {
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select visualization type" />
+                          <SelectValue>Select visualization type</SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="table">Table</SelectItem>

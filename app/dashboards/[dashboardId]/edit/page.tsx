@@ -218,7 +218,7 @@ export default function EditDashboardPage() {
                   onValueChange={(value) => setFolderId(value || null)}
                 >
                   <SelectTrigger id="folder">
-                    <SelectValue placeholder="Select a folder (optional)" />
+                    <SelectValue>Select a folder (optional)</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">None (Uncategorized)</SelectItem>
@@ -240,7 +240,6 @@ export default function EditDashboardPage() {
 
               <div className="flex justify-end gap-2 pt-4">
                 <Button
-                  type="button"
                   variant="outline"
                   nativeButton={false}
                   render={<Link href={`/dashboards/${dashboardId}`}>Cancel</Link>}

@@ -92,7 +92,7 @@ export function VisualizationOptionsEditor({ form }: VisualizationOptionsEditorP
     updateJson({ ...parsedOptions, disableTimeRange: checked })
   }
 
-  const handleUnitChange = (value: string) => {
+  const handleUnitChange = (value: string | null) => {
     const newOptions: VisualizationOptions = { ...parsedOptions, unit: value || undefined }
     // Remove customUnit if unit is not "custom"
     if (value !== "custom") {
@@ -113,7 +113,7 @@ export function VisualizationOptionsEditor({ form }: VisualizationOptionsEditorP
         <FieldContent>
           <Select value={unit || ""} onValueChange={handleUnitChange}>
             <SelectTrigger>
-              <SelectValue placeholder="Choose" />
+              <SelectValue>Choose</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">None</SelectItem>
@@ -208,7 +208,3 @@ export function VisualizationOptionsEditor({ form }: VisualizationOptionsEditorP
     </div>
   )
 }
-
-
-
-

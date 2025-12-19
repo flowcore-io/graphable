@@ -27,6 +27,7 @@ export default function EditDataSourcePage() {
   const [description, setDescription] = useState("")
   const [secretName, setSecretName] = useState("")
   const [hasSecret, setHasSecret] = useState(false)
+  const [newSecretName, setNewSecretName] = useState("")
   const [connectionInputType, setConnectionInputType] = useState<"string" | "split">("string")
 
   // Connection string input
@@ -187,19 +188,25 @@ export default function EditDataSourcePage() {
         name?: string
         description?: string
         secretPayload?: string
+        secretName?: string
       } = {
         name: name.trim() || undefined,
         description: description.trim() || undefined,
       }
 
-      // Only include secret update if provided (secret name cannot be changed)
+      // Include secret update if provided
       if (finalConnectionString) {
-        if (!hasSecret) {
-          setError("Cannot update secret: secret reference not found. Please create a new data source with a secret.")
-          setIsUpdating(false)
-          return
-        }
         updateData.secretPayload = finalConnectionString // Always store as connection string
+
+        // If secret reference doesn't exist, require secret name to create new secret
+        if (!hasSecret) {
+          if (!newSecretName.trim()) {
+            setError("Secret name is required to create a new secret when secret reference is missing.")
+            setIsUpdating(false)
+            return
+          }
+          updateData.secretName = newSecretName.trim()
+        }
       }
 
       const response = await fetch(`/api/data-sources/${dataSourceId}`, {
@@ -335,13 +342,32 @@ export default function EditDataSourcePage() {
                 </div>
               )}
 
-              {hasSecret && (
+              {!hasSecret && (
                 <div className="space-y-2">
-                  <Label>Connection Details (Optional - only if updating secret value)</Label>
-                  <Tabs
-                    value={connectionInputType}
-                    onValueChange={(v) => setConnectionInputType(v as "string" | "split")}
-                  >
+                  <Label htmlFor="newSecretName">Secret Name *</Label>
+                  <Input
+                    id="newSecretName"
+                    placeholder="my-database-secret"
+                    value={newSecretName}
+                    onChange={(e) => setNewSecretName(e.target.value)}
+                    required={!hasSecret}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Secret reference not found. Provide a name to create a new secret.
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>
+                  {hasSecret
+                    ? "Connection Details (Optional - only if updating secret value)"
+                    : "Connection Details *"}
+                </Label>
+                <Tabs
+                  value={connectionInputType}
+                  onValueChange={(v) => setConnectionInputType(v as "string" | "split")}
+                >
                     <TabsList variant="line" className="grid w-full grid-cols-2">
                       <TabsTrigger value="string">Connection String</TabsTrigger>
                       <TabsTrigger value="split">Split Input</TabsTrigger>
@@ -356,7 +382,9 @@ export default function EditDataSourcePage() {
                         rows={3}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Leave empty to keep existing secret. Paste new connection string to update secret value.
+                        {hasSecret
+                          ? "Leave empty to keep existing secret. Paste new connection string to update secret value."
+                          : "Paste connection string to create a new secret."}
                       </p>
                       {connectionString.trim() && (
                         <div className="space-y-2 rounded-lg border border-border bg-muted/50 p-3">
@@ -482,12 +510,13 @@ export default function EditDataSourcePage() {
                         </div>
                       )}
                       <p className="text-xs text-muted-foreground">
-                        Leave empty to keep existing secret. Fill fields to update secret value.
+                        {hasSecret
+                          ? "Leave empty to keep existing secret. Fill fields to update secret value."
+                          : "Fill fields to create a new secret."}
                       </p>
                     </TabsContent>
                   </Tabs>
                 </div>
-              )}
 
               {getFinalConnectionString() && (
                 <div className="space-y-2 pt-2">
@@ -518,12 +547,7 @@ export default function EditDataSourcePage() {
               )}
 
               <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  nativeButton={false}
-                  render={<Link href="/data-sources">Cancel</Link>}
-                />
+                <Button variant="outline" nativeButton={false} render={<Link href="/data-sources">Cancel</Link>} />
                 <Button type="submit" disabled={isUpdating}>
                   {isUpdating ? "Updating..." : "Update Data Source"}
                 </Button>
@@ -535,8 +559,3 @@ export default function EditDataSourcePage() {
     </div>
   )
 }
-
-
-
-
-

@@ -187,7 +187,7 @@ export default function NewDashboardPage() {
                   onValueChange={(value) => setFolderId(value || null)}
                 >
                   <SelectTrigger id="folder">
-                    <SelectValue placeholder="Select a folder (optional)" />
+                    <SelectValue>Select a folder (optional)</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">None (Uncategorized)</SelectItem>
@@ -202,12 +202,7 @@ export default function NewDashboardPage() {
               </div>
 
               <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  nativeButton={false}
-                  render={<Link href="/dashboards">Cancel</Link>}
-                />
+                <Button variant="outline" nativeButton={false} render={<Link href="/dashboards">Cancel</Link>} />
                 <Button type="submit" disabled={isCreating}>
                   {isCreating ? "Creating..." : "Create Dashboard"}
                 </Button>

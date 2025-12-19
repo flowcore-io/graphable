@@ -632,7 +632,16 @@ export async function executeQuery(
 
   // Bind parameters to query safely
   const { bindParametersToQuery } = await import("./parameter-validation.service")
-  const boundQuery = bindParametersToQuery(queryText, graphData.query.parameters, parametersWithDefaults)
+  const boundQuery = bindParametersToQuery(
+    queryText,
+    graphData.query.parameters as Array<{
+      name: string
+      type: "string" | "number" | "boolean" | "date" | "timestamp" | "enum" | "string[]" | "number[]"
+      required: boolean
+      default?: unknown
+    }>,
+    parametersWithDefaults
+  )
 
   // Execute query directly using database exploration service
   // This uses the data source's connection to execute the query
@@ -711,7 +720,16 @@ export async function executeMultipleQueriesPreview(
 
       // Bind parameters to query
       const { bindParametersToQuery } = await import("./parameter-validation.service")
-      const boundQuery = bindParametersToQuery(queryText, queryDef.parameters || [], parametersWithDefaults)
+      const boundQuery = bindParametersToQuery(
+        queryText,
+        (queryDef.parameters || []) as Array<{
+          name: string
+          type: "string" | "number" | "boolean" | "date" | "timestamp" | "enum" | "string[]" | "number[]"
+          required: boolean
+          default?: unknown
+        }>,
+        parametersWithDefaults
+      )
 
       // Execute query
       const result = await databaseExplorationService.executeQuery(

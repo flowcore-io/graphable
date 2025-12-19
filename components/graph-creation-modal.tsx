@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import type { ParameterDefinition } from "@/lib/services/graph.service"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2Icon, PlusIcon, TrashIcon } from "lucide-react"
 import { useEffect, useState } from "react"
@@ -287,11 +288,11 @@ export function GraphCreationModal({
                     ) : (
                       <Select
                         value={dataSourceRef}
-                        onValueChange={(value) => setValue("dataSourceRef", value)}
+                        onValueChange={(value) => setValue("dataSourceRef", value || "")}
                         aria-invalid={!!errors.dataSourceRef}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a data source">
+                          <SelectValue>
                             {dataSourceRef
                               ? dataSources.find((ds) => ds.fragmentId === dataSourceRef)?.name || dataSourceRef
                               : "Select a data source"}
@@ -339,7 +340,7 @@ export function GraphCreationModal({
                       }
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select visualization type" />
+                        <SelectValue>Select visualization type</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="table">Table</SelectItem>

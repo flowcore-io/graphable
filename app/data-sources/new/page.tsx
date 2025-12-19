@@ -401,12 +401,7 @@ export default function NewDataSourcePage() {
               </div>
 
               <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  nativeButton={false}
-                  render={<Link href="/data-sources">Cancel</Link>}
-                />
+                <Button variant="outline" nativeButton={false} render={<Link href="/data-sources">Cancel</Link>} />
                 <Button type="submit" disabled={isCreating}>
                   {isCreating ? "Creating..." : "Create Data Source"}
                 </Button>
@@ -418,8 +413,3 @@ export default function NewDataSourcePage() {
     </div>
   )
 }
-
-
-
-
-

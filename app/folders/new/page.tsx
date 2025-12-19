@@ -159,7 +159,7 @@ export default function NewFolderPage() {
                 <Label htmlFor="parentFolder">Parent Folder (Optional)</Label>
                 <Select value={parentFolderId || ""} onValueChange={(value) => setParentFolderId(value || undefined)}>
                   <SelectTrigger id="parentFolder">
-                    <SelectValue placeholder="Select a parent folder (optional)" />
+                    <SelectValue>Select a parent folder (optional)</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">None (Root Level)</SelectItem>
@@ -176,12 +176,7 @@ export default function NewFolderPage() {
               </div>
 
               <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  nativeButton={false}
-                  render={<Link href="/dashboards">Cancel</Link>}
-                />
+                <Button variant="outline" nativeButton={false} render={<Link href="/dashboards">Cancel</Link>} />
                 <Button type="submit" disabled={isCreating}>
                   {isCreating ? "Creating..." : "Create Folder"}
                 </Button>

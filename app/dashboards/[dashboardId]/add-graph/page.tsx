@@ -216,9 +216,9 @@ export default function AddGraphToDashboardPage() {
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="graph">Select Graph</Label>
-                    <Select value={selectedGraphId} onValueChange={setSelectedGraphId}>
+                    <Select value={selectedGraphId} onValueChange={(value) => setSelectedGraphId(value || "")}>
                       <SelectTrigger id="graph">
-                        <SelectValue placeholder="Select a graph" />
+                        <SelectValue>Select a graph</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {graphs.map((graph) => (
@@ -232,7 +232,6 @@ export default function AddGraphToDashboardPage() {
 
                   <div className="flex justify-end gap-2 pt-4">
                     <Button
-                      type="button"
                       variant="outline"
                       nativeButton={false}
                       render={<Link href={`/dashboards/${dashboardId}`}>Cancel</Link>}

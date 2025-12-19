@@ -27,6 +27,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import type * as React from "react"
 import { useState } from "react"
 
 interface Dashboard {
@@ -123,7 +124,7 @@ export function DashboardTable({ folders, dashboards, isLoading }: DashboardTabl
     }
   }
 
-  const renderFolderRow = (folder: FolderTreeNode, level: number = 0) => {
+  const renderFolderRow = (folder: FolderTreeNode, level: number = 0): React.ReactNode => {
     const isExpanded = expandedFolders.has(folder.id)
     const folderDashboards = getDashboardsForFolder(folder.id)
     const totalDashboards = countDashboardsRecursive(folder) // Use recursive count

@@ -1,6 +1,6 @@
 import { env } from "@/lib/env"
 import { getOrCreateUser } from "@/lib/services/user.service"
-import type { DefaultSession, NextAuthOptions } from "next-auth"
+import type { DefaultSession, NextAuthOptions, Session } from "next-auth"
 import type { JWT } from "next-auth/jwt"
 import KeycloakProvider from "next-auth/providers/keycloak"
 
@@ -282,7 +282,7 @@ export const authOptions: NextAuthOptions = {
 
       return refreshedToken
     },
-    async session({ session, token }) {
+    async session({ session, token }): Promise<Session> {
       // Send properties to the client
       if (token) {
         // Try to extract Usable user ID from ID token if not already set
@@ -300,9 +300,14 @@ export const authOptions: NextAuthOptions = {
           console.error(`❌ Session invalidated for user ${token.email} - missing usableUserId (required for billing)`)
           // Set error to trigger middleware redirect to explanation page
           token.error = "MissingUsableUserId"
-          // Don't set session data - this will cause session to be invalid
-          // biome-ignore lint/suspicious/noExplicitAny: NextAuth JWT callback can return null to invalidate session
-          return null as unknown as JWT // Return null to invalidate session
+          // Return session without user data - this will cause session to be invalid
+          return {
+            ...session,
+            user: {
+              ...session.user,
+              id: "",
+            },
+          }
         }
 
         // Use Usable user ID (required - we've already validated it exists above)

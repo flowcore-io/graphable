@@ -68,18 +68,22 @@ export function GraphPreview({ formData, workspaceId }: GraphPreviewProps) {
       if (!q || typeof q !== "object") return false
       // For SQL queries, check if text and dataSourceRef are present and non-empty
       if ("dialect" in q && q.dialect === "sql") {
+        const sqlQuery = q as { text?: string; dataSourceRef?: string }
         return (
-          q.text &&
-          typeof q.text === "string" &&
-          q.text.trim().length > 0 &&
-          q.dataSourceRef &&
-          typeof q.dataSourceRef === "string" &&
-          q.dataSourceRef.trim().length > 0
+          sqlQuery.text &&
+          typeof sqlQuery.text === "string" &&
+          sqlQuery.text.trim().length > 0 &&
+          sqlQuery.dataSourceRef &&
+          typeof sqlQuery.dataSourceRef === "string" &&
+          sqlQuery.dataSourceRef.trim().length > 0
         )
       }
       // For expressions, check if expression is present and non-empty
       if ("operation" in q) {
-        return q.expression && typeof q.expression === "string" && q.expression.trim().length > 0
+        const exprQuery = q as { expression?: string }
+        return (
+          exprQuery.expression && typeof exprQuery.expression === "string" && exprQuery.expression.trim().length > 0
+        )
       }
       return false
     })
@@ -206,9 +210,7 @@ export function GraphPreview({ formData, workspaceId }: GraphPreviewProps) {
 
   // Register executePreview function in context so it can be called from Run button
   useEffect(() => {
-    setExecutePreview(() => {
-      return executePreview
-    })
+    setExecutePreview(executePreview)
     return () => {
       setExecutePreview(null)
     }
@@ -239,17 +241,19 @@ export function GraphPreview({ formData, workspaceId }: GraphPreviewProps) {
   const validQueries = queries.filter((q: unknown) => {
     if (!q || typeof q !== "object") return false
     if ("dialect" in q && q.dialect === "sql") {
+      const sqlQuery = q as { text?: string; dataSourceRef?: string }
       return (
-        q.text &&
-        typeof q.text === "string" &&
-        q.text.trim().length > 0 &&
-        q.dataSourceRef &&
-        typeof q.dataSourceRef === "string" &&
-        q.dataSourceRef.trim().length > 0
+        sqlQuery.text &&
+        typeof sqlQuery.text === "string" &&
+        sqlQuery.text.trim().length > 0 &&
+        sqlQuery.dataSourceRef &&
+        typeof sqlQuery.dataSourceRef === "string" &&
+        sqlQuery.dataSourceRef.trim().length > 0
       )
     }
     if ("operation" in q) {
-      return q.expression && typeof q.expression === "string" && q.expression.trim().length > 0
+      const exprQuery = q as { expression?: string }
+      return exprQuery.expression && typeof exprQuery.expression === "string" && exprQuery.expression.trim().length > 0
     }
     return false
   })
@@ -345,7 +349,3 @@ export function GraphPreview({ formData, workspaceId }: GraphPreviewProps) {
     </div>
   )
 }
-
-
-
-

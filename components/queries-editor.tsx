@@ -48,11 +48,11 @@ export function QueriesEditor<T extends FieldValues = FieldValues>({
     remove,
   } = useFieldArray({
     control: form.control,
-    name: "queries",
+    name: "queries" as any, // Type assertion needed for dynamic form paths
   })
 
   const getNextRefId = (): string => {
-    const usedRefIds = queries.map((q: QueryOrExpression) => q.refId)
+    const usedRefIds = (queries as unknown as QueryOrExpression[]).map((q) => q.refId)
     const allLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("")
     for (const letter of allLetters) {
       if (!usedRefIds.includes(letter)) {
@@ -71,7 +71,7 @@ export function QueriesEditor<T extends FieldValues = FieldValues>({
       dataSourceRef: defaultDataSourceRef || dataSources[0]?.fragmentId || "",
       parameters: [],
       hidden: false,
-    } as QueryDefinition)
+    } as unknown as any)
   }
 
   const addExpression = () => {
@@ -81,7 +81,7 @@ export function QueriesEditor<T extends FieldValues = FieldValues>({
       operation: "math",
       expression: "",
       hidden: false,
-    } as ExpressionDefinition)
+    } as unknown as any)
   }
 
   const removeQuery = (index: number) => {
@@ -98,27 +98,33 @@ export function QueriesEditor<T extends FieldValues = FieldValues>({
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <CardTitle className="text-base font-medium shrink-0">
-                  {isExpression ? `${query.refId} (Expression)` : query.refId}
+                  {isExpression
+                    ? `${(query as unknown as ExpressionDefinition).refId} (Expression)`
+                    : (query as unknown as QueryDefinition).refId}
                 </CardTitle>
                 <Input
-                  {...form.register(`queries.${index}.name`)}
-                  placeholder={isExpression ? `Expression ${query.refId}` : `Query ${query.refId}`}
+                  {...form.register(`queries.${index}.name` as any)}
+                  placeholder={
+                    isExpression
+                      ? `Expression ${(query as unknown as ExpressionDefinition).refId}`
+                      : `Query ${(query as unknown as QueryDefinition).refId}`
+                  }
                   className="h-8 flex-1 min-w-0 max-w-xs"
                   onBlur={(e) => {
                     const value = e.target.value.trim()
-                    form.setValue(`queries.${index}.name`, value || undefined)
+                    form.setValue(`queries.${index}.name` as any, (value || undefined) as any)
                   }}
                 />
                 <div className="flex items-center gap-2 shrink-0">
                   <div className="flex items-center gap-2">
-                    {form.watch(`queries.${index}.hidden`) ? (
+                    {(form.watch(`queries.${index}.hidden` as any) as boolean | undefined) ? (
                       <EyeOffIcon className="h-4 w-4 text-muted-foreground" />
                     ) : (
                       <EyeIcon className="h-4 w-4 text-muted-foreground" />
                     )}
                     <Switch
-                      checked={form.watch(`queries.${index}.hidden`) || false}
-                      onCheckedChange={(checked) => form.setValue(`queries.${index}.hidden`, checked)}
+                      checked={(form.watch(`queries.${index}.hidden` as any) as boolean | undefined) || false}
+                      onCheckedChange={(checked) => form.setValue(`queries.${index}.hidden` as any, checked as any)}
                       aria-label="Hide from visualization"
                     />
                   </div>
@@ -127,8 +133,8 @@ export function QueriesEditor<T extends FieldValues = FieldValues>({
               <div className="flex items-center gap-2 shrink-0">
                 {isExpression ? (
                   <Select
-                    value={form.watch(`queries.${index}.operation`)}
-                    onValueChange={(value) => form.setValue(`queries.${index}.operation`, value)}
+                    value={(form.watch(`queries.${index}.operation` as any) as string | undefined) || ""}
+                    onValueChange={(value) => form.setValue(`queries.${index}.operation` as any, (value || "") as any)}
                   >
                     <SelectTrigger className="w-32">
                       <SelectValue />
@@ -162,7 +168,7 @@ export function QueriesEditor<T extends FieldValues = FieldValues>({
                     <FieldLabel>Expression</FieldLabel>
                     <FieldContent>
                       <Input
-                        {...form.register(`queries.${index}.expression`)}
+                        {...form.register(`queries.${index}.expression` as any)}
                         placeholder="$A + $B"
                         className="font-mono"
                       />
@@ -179,13 +185,17 @@ export function QueriesEditor<T extends FieldValues = FieldValues>({
                     <FieldLabel>Data Source</FieldLabel>
                     <FieldContent>
                       <Select
-                        value={form.watch(`queries.${index}.dataSourceRef`)}
-                        onValueChange={(value) => form.setValue(`queries.${index}.dataSourceRef`, value)}
+                        value={(form.watch(`queries.${index}.dataSourceRef` as any) as string | undefined) || ""}
+                        onValueChange={(value) =>
+                          form.setValue(`queries.${index}.dataSourceRef` as any, (value || "") as any)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue>
                             {(() => {
-                              const selectedDataSourceRef = form.watch(`queries.${index}.dataSourceRef`)
+                              const selectedDataSourceRef = form.watch(`queries.${index}.dataSourceRef` as any) as
+                                | string
+                                | undefined
                               return selectedDataSourceRef
                                 ? dataSources.find((ds) => ds.fragmentId === selectedDataSourceRef)?.name ||
                                     selectedDataSourceRef
@@ -204,8 +214,8 @@ export function QueriesEditor<T extends FieldValues = FieldValues>({
                     </FieldContent>
                   </Field>
                   <SqlQueryEditor
-                    value={form.watch(`queries.${index}.text`) || ""}
-                    onChange={(value) => form.setValue(`queries.${index}.text`, value)}
+                    value={(form.watch(`queries.${index}.text` as any) as string | undefined) || ""}
+                    onChange={(value) => form.setValue(`queries.${index}.text` as any, (value || "") as any)}
                   />
                 </>
               )}
@@ -227,7 +237,3 @@ export function QueriesEditor<T extends FieldValues = FieldValues>({
     </div>
   )
 }
-
-
-
-

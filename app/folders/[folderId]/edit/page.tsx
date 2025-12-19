@@ -204,7 +204,7 @@ export default function EditFolderPage() {
                   onValueChange={(value) => setParentFolderId(value || null)}
                 >
                   <SelectTrigger id="parentFolder">
-                    <SelectValue placeholder="Select a parent folder (optional)" />
+                    <SelectValue>Select a parent folder (optional)</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">None (Root Level)</SelectItem>
@@ -221,12 +221,7 @@ export default function EditFolderPage() {
               </div>
 
               <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  nativeButton={false}
-                  render={<Link href="/dashboards">Cancel</Link>}
-                />
+                <Button variant="outline" nativeButton={false} render={<Link href="/dashboards">Cancel</Link>} />
                 <Button type="submit" disabled={isUpdating}>
                   {isUpdating ? "Updating..." : "Update Folder"}
                 </Button>

@@ -77,7 +77,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ dash
       }
 
       // Parse and validate request body
-      const body = await request.json()
+      const body = await req.json()
       console.log("Dashboard update request body:", JSON.stringify(body, null, 2))
 
       const start = Date.now()

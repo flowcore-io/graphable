@@ -78,7 +78,7 @@ async function createGraphs() {
         headers: {
           "Content-Type": "application/json",
           "X-Workspace-Id": WORKSPACE_ID,
-          Cookie: sessionCookie,
+          ...(sessionCookie && { Cookie: sessionCookie }),
         },
         body: JSON.stringify({
           title: graphDef.title,
@@ -115,7 +115,7 @@ async function createGraphs() {
       const dashboardResponse = await fetch(`${BASE_URL}/api/dashboards/${DASHBOARD_ID}`, {
         headers: {
           "X-Workspace-Id": WORKSPACE_ID,
-          Cookie: sessionCookie,
+          ...(sessionCookie && { Cookie: sessionCookie }),
         },
       })
 
@@ -165,7 +165,7 @@ async function createGraphs() {
         headers: {
           "Content-Type": "application/json",
           "X-Workspace-Id": WORKSPACE_ID,
-          Cookie: sessionCookie,
+          ...(sessionCookie && { Cookie: sessionCookie }),
         },
         body: JSON.stringify({
           layout: {

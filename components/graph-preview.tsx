@@ -44,20 +44,11 @@ interface ExecutionResult {
  * Executes the query and displays the visualization as the user types
  */
 export function GraphPreview({ formData, workspaceId }: GraphPreviewProps) {
-  const { timeRange, refreshTrigger, parameters, setExecutePreview } = useGraphEditor()
+  const { timeRange, refreshTrigger, parameters, setExecutePreview, triggerRefresh } = useGraphEditor()
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const refreshTriggerRef = useRef(refreshTrigger)
-
-  // Update ref when refreshTrigger changes
-  useEffect(() => {
-    if (refreshTrigger !== refreshTriggerRef.current) {
-      refreshTriggerRef.current = refreshTrigger
-      // Trigger execution when refresh is requested
-      void executePreview()
-    }
-  }, [refreshTrigger])
 
   const executePreview = useCallback(async () => {
     // Support both multiple queries (new) and single query (legacy)
@@ -190,10 +181,13 @@ export function GraphPreview({ formData, workspaceId }: GraphPreviewProps) {
 
       const result = await response.json()
       setExecutionResult(result)
+      // Don't trigger refresh here - it causes infinite loop
+      // The refresh button already triggers execution via useEffect watching refreshTrigger
     } catch (err) {
       console.error("Failed to execute preview:", err)
       setError(err instanceof Error ? err.message : "Failed to execute query")
       setExecutionResult(null)
+      // Don't trigger refresh on errors
     } finally {
       setIsLoading(false)
     }
@@ -311,8 +305,8 @@ export function GraphPreview({ formData, workspaceId }: GraphPreviewProps) {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        {columns.map((col) => (
-                          <TableHead key={col}>{col}</TableHead>
+                        {columns.map((col, colIndex) => (
+                          <TableHead key={`${col}-${colIndex}`}>{col}</TableHead>
                         ))}
                       </TableRow>
                     </TableHeader>
@@ -321,8 +315,8 @@ export function GraphPreview({ formData, workspaceId }: GraphPreviewProps) {
                         const rowKey = `${String(row[columns[0]] ?? "")}-${index}`
                         return (
                           <TableRow key={rowKey}>
-                            {columns.map((col) => (
-                              <TableCell key={col}>{String(row[col] ?? "")}</TableCell>
+                            {columns.map((col, colIndex) => (
+                              <TableCell key={`${col}-${colIndex}`}>{String(row[col] ?? "")}</TableCell>
                             ))}
                           </TableRow>
                         )

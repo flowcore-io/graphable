@@ -100,6 +100,7 @@ function EditGraphPageContent() {
     setTimeRange: setContextTimeRange,
     setParameters: setContextParameters,
     executePreview,
+    triggerRefresh,
   } = useGraphEditor()
 
   // Sync form state with context (form -> context)
@@ -495,9 +496,20 @@ function EditGraphPageContent() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      if (executePreview) {
-                        void executePreview()
+                    onClick={async () => {
+                      const previewFn = executePreview
+                      if (previewFn && typeof previewFn === "function") {
+                        try {
+                          await previewFn()
+                          // Trigger refresh after successful execution to ensure preview updates
+                          // This ensures the preview component re-renders with the new data
+                          triggerRefresh()
+                        } catch (error) {
+                          // Error already handled in executePreview, don't trigger refresh
+                          console.error("Failed to execute preview:", error)
+                        }
+                      } else {
+                        console.warn("executePreview is not available or not a function", { executePreview, type: typeof executePreview })
                       }
                     }}
                     disabled={!queryText || !dataSourceRef || !executePreview}

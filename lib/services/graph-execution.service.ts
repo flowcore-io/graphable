@@ -131,13 +131,30 @@ function combineQueryResults(
   }
 
   // Helper function to get display name for a column
-  const getColumnDisplayName = (refId: string, columnName: string, queryDef?: { name?: string }): string => {
+  // Custom query name should only be used when there's a single value column (for time series)
+  // For SELECT * queries with multiple columns, preserve original column names
+  const getColumnDisplayName = (
+    refId: string,
+    columnName: string,
+    queryDef?: { name?: string },
+    totalColumns?: number
+  ): string => {
     const queryName = queryDef?.name
-    if (queryName) {
-      // Use custom name if provided
+    
+    // For SELECT * queries with many columns, preserve original column names
+    if (totalColumns && totalColumns > 2) {
+      return columnName
+    }
+    
+    // Only use custom name if:
+    // 1. Query has a custom name
+    // 2. There are exactly 2 columns (date + value) - typical time series pattern
+    if (queryName && totalColumns === 2) {
+      // Use custom name for the value column (second column)
       return queryName
     }
-    // Fallback to refId_columnName
+    
+    // Fallback to refId_columnName for single queries without custom name
     return `${refId}_${columnName}`
   }
 
@@ -149,17 +166,19 @@ function combineQueryResults(
     if (!result) {
       return { data: [], columns: [] }
     }
-    // Prefix numeric columns (all except first) with custom name or refId
+    // For SELECT * queries with many columns, preserve original column names
+    // Only apply custom name for time series (2 columns: date + value)
+    const totalColumns = result.columns.length
     const prefixedColumns = result.columns.map((col, index) => {
       if (index === 0) return col // Keep first column as-is (usually date)
-      return getColumnDisplayName(refId, col, queryDef)
+      return getColumnDisplayName(refId, col, queryDef, totalColumns)
     })
     const prefixedData = result.data.map((row) => {
       if (typeof row !== "object" || row === null) return row
       const rowObj = row as Record<string, unknown>
       const prefixedRow: Record<string, unknown> = {}
       result.columns.forEach((col, index) => {
-        const newColName = index === 0 ? col : getColumnDisplayName(refId, col, queryDef)
+        const newColName = index === 0 ? col : getColumnDisplayName(refId, col, queryDef, totalColumns)
         prefixedRow[newColName] = rowObj[col]
       })
       return prefixedRow
@@ -201,9 +220,11 @@ function combineQueryResults(
     const result = queryResults[refId]
     if (!result) continue
     // Add all columns except the first (date) with custom name or refId prefix
+    // For SELECT * queries with many columns, preserve original column names
+    const totalColumns = result.columns.length
     for (let i = 1; i < result.columns.length; i++) {
       const col = result.columns[i]
-      combinedColumns.push(getColumnDisplayName(refId, col, queryDef))
+      combinedColumns.push(getColumnDisplayName(refId, col, queryDef, totalColumns))
     }
   }
 
@@ -230,16 +251,19 @@ function combineQueryResults(
       if (matchingRow && typeof matchingRow === "object" && matchingRow !== null) {
         const rowObj = matchingRow as Record<string, unknown>
         // Copy all columns except the first (date) with custom name or refId prefix
+        // For SELECT * queries with many columns, preserve original column names
+        const totalColumns = result.columns.length
         for (let i = 1; i < result.columns.length; i++) {
           const col = result.columns[i]
-          const displayName = getColumnDisplayName(refId, col, queryDef)
+          const displayName = getColumnDisplayName(refId, col, queryDef, totalColumns)
           combinedRow[displayName] = rowObj[col]
         }
       } else {
         // No matching row - fill with null
+        const totalColumns = result.columns.length
         for (let i = 1; i < result.columns.length; i++) {
           const col = result.columns[i]
-          const displayName = getColumnDisplayName(refId, col, queryDef)
+          const displayName = getColumnDisplayName(refId, col, queryDef, totalColumns)
           combinedRow[displayName] = null
         }
       }
@@ -557,9 +581,11 @@ function injectTimeRangeFilter(
     }
   }
 
-  // Default to "created_at" if no column found
+  // If no date column found, skip time range filtering (graceful fallback)
+  // This follows the pattern in database-exploration.service.ts where queries
+  // gracefully fall back when assumptions can't be made about schema
   if (!dateColumn) {
-    dateColumn = "created_at"
+    return queryText
   }
 
   // Calculate the date threshold

@@ -292,6 +292,57 @@ export async function sampleRows(
 }
 
 /**
+ * Extract column names from PostgreSQL result with fallback validation
+ * When queries are wrapped in subqueries, result.fields may contain duplicate/incorrect names
+ * This function validates and falls back to extracting from row keys if needed
+ */
+function extractColumnNames(result: { fields?: Array<{ name: string }>; rows: unknown[] }): string[] {
+  // First, try to extract from result.fields
+  const fieldsColumns = result.fields ? result.fields.map((field) => field.name) : []
+
+  // If no fields, return empty array
+  if (fieldsColumns.length === 0) {
+    return []
+  }
+
+  // Validate: check if all column names are unique
+  const uniqueColumns = new Set(fieldsColumns)
+  const hasDuplicates = uniqueColumns.size !== fieldsColumns.length
+
+  // If we have rows, validate that column names match row keys
+  let columnsMatchRowKeys = true
+  if (result.rows.length > 0) {
+    const firstRow = result.rows[0]
+    if (firstRow && typeof firstRow === "object" && firstRow !== null) {
+      const rowKeys = Object.keys(firstRow)
+      // Check if all field columns exist in row keys and vice versa
+      const fieldSet = new Set(fieldsColumns)
+      const rowKeySet = new Set(rowKeys)
+      columnsMatchRowKeys =
+        fieldsColumns.length === rowKeys.length &&
+        fieldsColumns.every((col) => rowKeySet.has(col)) &&
+        rowKeys.every((key) => fieldSet.has(key))
+    }
+  }
+
+  // If validation passes (no duplicates and columns match row keys), use fields
+  if (!hasDuplicates && columnsMatchRowKeys) {
+    return fieldsColumns
+  }
+
+  // Validation failed - fall back to extracting from first row's keys
+  if (result.rows.length > 0) {
+    const firstRow = result.rows[0]
+    if (firstRow && typeof firstRow === "object" && firstRow !== null) {
+      return Object.keys(firstRow)
+    }
+  }
+
+  // Fallback: return fields columns even if invalid (better than empty)
+  return fieldsColumns
+}
+
+/**
  * Execute a SQL query with pagination
  * Returns paginated results with total count
  */
@@ -407,8 +458,8 @@ export async function executeQuery(
       canCount = true
     }
 
-    // Extract column names from result (only for SELECT queries)
-    const columns = result.fields ? result.fields.map((field: { name: string }) => field.name) : []
+    // Extract column names from result with fallback validation (only for SELECT queries)
+    const columns = isSelectQuery ? extractColumnNames(result) : []
 
     // If we couldn't get count for SELECT queries, estimate it (not accurate but better than nothing)
     if (!canCount && isSelectQuery) {

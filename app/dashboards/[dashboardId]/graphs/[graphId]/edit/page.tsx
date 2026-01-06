@@ -153,7 +153,10 @@ function EditGraphPageContent() {
 
   // Reset initial preview flag when graphId changes
   useEffect(() => {
-    hasExecutedInitialPreview.current = false
+    // Reset flag when graphId changes
+    if (graphId) {
+      hasExecutedInitialPreview.current = false
+    }
   }, [graphId])
 
   // Load existing graph data

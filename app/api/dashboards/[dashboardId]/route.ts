@@ -1,7 +1,6 @@
 import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
 import { createSessionPathwayForAPI } from "@/lib/pathways/session-provider"
 import * as dashboardService from "@/lib/services/dashboard.service"
-import { request } from "http"
 import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 

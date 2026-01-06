@@ -9,6 +9,8 @@ import { BellIcon, LayoutDashboardIcon, ListFilterIcon, PlusIcon, RefreshCwIcon,
 import { getServerSession } from "next-auth"
 import Link from "next/link"
 
+export const dynamic = "force-dynamic"
+
 export default async function Page() {
   const session = await getServerSession(authOptions)
   let workspaceId: string | null = null

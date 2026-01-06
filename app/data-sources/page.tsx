@@ -7,6 +7,8 @@ import { DatabaseIcon, PlusIcon } from "lucide-react"
 import { getServerSession } from "next-auth"
 import Link from "next/link"
 
+export const dynamic = "force-dynamic"
+
 export default async function DataSourcesPage() {
   const session = await getServerSession(authOptions)
   let workspaceId: string | null = null

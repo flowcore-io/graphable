@@ -24,8 +24,3 @@ export async function GET(request: Request) {
   // Redirect to Keycloak logout (which will handle the full logout flow)
   return NextResponse.redirect(new URL("/api/auth/keycloak-logout", origin))
 }
-
-
-
-
-

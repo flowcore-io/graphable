@@ -216,7 +216,3 @@ export function GraphParametersEditor({ form }: GraphParametersEditorProps) {
     </Card>
   )
 }
-
-
-
-

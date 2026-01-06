@@ -204,7 +204,3 @@ export function SqlQueryEditor({ value, onChange, error }: SqlQueryEditorProps) 
     </Field>
   )
 }
-
-
-
-

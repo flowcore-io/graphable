@@ -30,8 +30,3 @@ export async function handlerDataSourceDeleted(event: FlowcoreEvent<EventDataSou
   const { fragmentId } = event.payload
   console.log(`✅ Data source deleted: fragment ${fragmentId} - data removed from Usable`)
 }
-
-
-
-
-

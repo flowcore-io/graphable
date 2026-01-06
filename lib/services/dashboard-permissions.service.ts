@@ -126,9 +126,3 @@ export async function getDashboardPermissions(dashboardId: string) {
 export async function getParameterPermissions(dashboardId: string) {
   return db.select().from(parameterPermissions).where(eq(parameterPermissions.dashboardId, dashboardId))
 }
-
-
-
-
-
-

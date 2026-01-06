@@ -524,7 +524,10 @@ function NewGraphPageContent() {
                           console.error("Failed to execute preview:", error)
                         }
                       } else {
-                        console.warn("executePreview is not available or not a function", { executePreview, type: typeof executePreview })
+                        console.warn("executePreview is not available or not a function", {
+                          executePreview,
+                          type: typeof executePreview,
+                        })
                       }
                     }}
                     disabled={!executePreview}

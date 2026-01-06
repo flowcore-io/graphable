@@ -107,11 +107,3 @@ export async function getWorkspaceForUser(usableUserId: string): Promise<string 
   const tenantLink = await getTenantLink(usableUserId)
   return tenantLink?.workspaceId || null
 }
-
-
-
-
-
-
-
-

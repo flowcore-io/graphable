@@ -236,11 +236,3 @@ export default function LinkWorkspacePage() {
     </div>
   )
 }
-
-
-
-
-
-
-
-

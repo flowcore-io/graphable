@@ -197,7 +197,3 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) =
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 })
-
-
-
-

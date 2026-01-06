@@ -44,11 +44,3 @@ export function WorkspaceGuard({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>
 }
-
-
-
-
-
-
-
-

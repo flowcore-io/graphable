@@ -140,12 +140,12 @@ function combineQueryResults(
     totalColumns?: number
   ): string => {
     const queryName = queryDef?.name
-    
+
     // For SELECT * queries with many columns, preserve original column names
     if (totalColumns && totalColumns > 2) {
       return columnName
     }
-    
+
     // Only use custom name if:
     // 1. Query has a custom name
     // 2. There are exactly 2 columns (date + value) - typical time series pattern
@@ -153,7 +153,7 @@ function combineQueryResults(
       // Use custom name for the value column (second column)
       return queryName
     }
-    
+
     // Fallback to refId_columnName for single queries without custom name
     return `${refId}_${columnName}`
   }

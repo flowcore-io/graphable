@@ -172,8 +172,8 @@ export function QueriesEditor<T extends FieldValues = FieldValues>({
                       className="font-mono"
                     />
                     <FieldDescription>
-                      Math operations on one or more queries. Reference queries by $refId (e.g., $A, $B). Examples: $A
-                      + $B, $A * 2, $A - $B
+                      Math operations on one or more queries. Reference queries by $refId (e.g., $A, $B). Examples: $A +
+                      $B, $A * 2, $A - $B
                     </FieldDescription>
                   </FieldContent>
                 </Field>

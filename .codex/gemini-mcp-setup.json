@@ -1,0 +1,16 @@
+{
+	"mcpServers": {
+		"usable": {
+			"httpUrl": "https://usable.dev/api/mcp",
+			"headers": {
+				"Authorization": "Bearer $USABLE_API_TOKEN"
+			},
+			"description": "Usable MCP Server for fetching Flowcore Next.js standards"
+		}
+	},
+	"defaultSettings": {
+		"model": "gemini-2.0-flash-thinking-exp",
+		"temperature": 0.7,
+		"maxTokens": 8192
+	}
+}

@@ -1,0 +1,28 @@
+# Gemini CLI Configuration for PR Validation
+# Gemini CLI uses settings.json in ~/.gemini/ directory
+# This file is for documentation purposes
+
+# Note: Gemini CLI configuration is managed differently than Codex CLI
+# The actual configuration is set via environment variables and ~/.gemini/settings.json
+
+[project]
+name = "usable-pr-validation"
+description = "Automated PR validation using Gemini CLI with Usable MCP"
+
+[model]
+# Gemini model selection (set via CLI --model flag or environment)
+default_model = "gemini-2.0-flash-thinking-exp"
+provider = "google"
+
+[settings]
+# These are passed via CLI flags or environment variables
+max_iterations = 100
+temperature = 0.7
+
+# MCP Configuration
+# For Gemini CLI, MCP servers are configured in ~/.gemini/settings.json
+# See: .codex/gemini-mcp-setup.json for the template
+
+# Environment variables required:
+# - GEMINI_API_KEY: Your Google AI API key
+# - USABLE_API_TOKEN: Bearer token for Usable MCP server

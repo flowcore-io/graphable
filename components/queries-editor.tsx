@@ -163,22 +163,20 @@ export function QueriesEditor<T extends FieldValues = FieldValues>({
             </CardHeader>
             <CardContent className="space-y-4">
               {isExpression ? (
-                <>
-                  <Field>
-                    <FieldLabel>Expression</FieldLabel>
-                    <FieldContent>
-                      <Input
-                        {...form.register(`queries.${index}.expression` as any)}
-                        placeholder="$A + $B"
-                        className="font-mono"
-                      />
-                      <FieldDescription>
-                        Math operations on one or more queries. Reference queries by $refId (e.g., $A, $B). Examples: $A
-                        + $B, $A * 2, $A - $B
-                      </FieldDescription>
-                    </FieldContent>
-                  </Field>
-                </>
+                <Field>
+                  <FieldLabel>Expression</FieldLabel>
+                  <FieldContent>
+                    <Input
+                      {...form.register(`queries.${index}.expression` as any)}
+                      placeholder="$A + $B"
+                      className="font-mono"
+                    />
+                    <FieldDescription>
+                      Math operations on one or more queries. Reference queries by $refId (e.g., $A, $B). Examples: $A
+                      + $B, $A * 2, $A - $B
+                    </FieldDescription>
+                  </FieldContent>
+                </Field>
               ) : (
                 <>
                   <Field>

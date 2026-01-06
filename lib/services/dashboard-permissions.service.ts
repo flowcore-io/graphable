@@ -1,6 +1,6 @@
 import { db } from "@/db"
 import { dashboardPermissions, parameterPermissions } from "@/db/schema"
-import { randomUUID } from "crypto"
+import { randomUUID } from "node:crypto"
 import { and, eq } from "drizzle-orm"
 
 /**

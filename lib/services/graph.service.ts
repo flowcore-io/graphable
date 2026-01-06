@@ -1,5 +1,5 @@
 import type { SessionPathwayBuilder } from "@flowcore/pathways"
-import { randomUUID } from "crypto"
+import { randomUUID } from "node:crypto"
 import { ulid } from "ulid"
 import { z } from "zod"
 import * as graphContract from "../pathways/contracts/graph.0"
@@ -260,7 +260,7 @@ export async function createGraph(
     queriesCount: validatedContent.queries?.length || 0,
     fragmentInput: {
       ...fragmentInput,
-      content: fragmentInput.content.substring(0, 500) + "...", // Truncate for logging
+      content: `${fragmentInput.content.substring(0, 500)}...`, // Truncate for logging
     },
   })
 

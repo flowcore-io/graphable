@@ -1,6 +1,7 @@
 import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
 import { createSessionPathwayForAPI } from "@/lib/pathways/session-provider"
 import * as dashboardService from "@/lib/services/dashboard.service"
+import { request } from "http"
 import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
@@ -20,7 +21,7 @@ const updateDashboardSchema = dashboardService.updateDashboardInputSchema.extend
  * Get a dashboard by ID
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ dashboardId: string }> }) {
-  return requireWorkspace(async (request: NextRequest, { workspaceId, userId, accessToken }) => {
+  return requireWorkspace(async (_request: NextRequest, { workspaceId, userId: _userId, accessToken }) => {
     try {
       const { dashboardId } = await params
 
@@ -63,7 +64,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ dash
  * Update a dashboard
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ dashboardId: string }> }) {
-  return requireWorkspace(async (request: NextRequest, { workspaceId, userId, accessToken }) => {
+  return requireWorkspace(async (_request: NextRequest, { workspaceId, userId: _userId, accessToken }) => {
     try {
       const { dashboardId } = await params
 
@@ -131,7 +132,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ dash
  * Delete a dashboard
  */
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ dashboardId: string }> }) {
-  return requireWorkspace(async (request: NextRequest, { workspaceId, userId, accessToken }) => {
+  return requireWorkspace(async (_request: NextRequest, { workspaceId, userId: _userId, accessToken }) => {
     try {
       const { dashboardId } = await params
 

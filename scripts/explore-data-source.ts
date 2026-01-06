@@ -41,7 +41,8 @@ const client = new Client({
 
 async function exploreDatabase() {
   try {
-    console.log(`🔌 Connecting to database: ${url.database}@${url.hostname}`)
+    const databaseName = url.pathname.slice(1) // Remove leading /
+    console.log(`🔌 Connecting to database: ${databaseName}@${url.hostname}`)
     await client.connect()
     console.log("✅ Connected successfully!\n")
 
@@ -65,7 +66,7 @@ async function exploreDatabase() {
     }
 
     // Explore each table
-    console.log("\n" + "=".repeat(80))
+    console.log(`\n${"=".repeat(80)}`)
     console.log("📈 Exploring table structures and sample data...\n")
 
     for (const { schema, name } of tables) {
@@ -113,8 +114,8 @@ async function exploreDatabase() {
 
         if (sampleResult.rows.length > 0) {
           // Print header
-          console.log("\n  " + columns.join(" | "))
-          console.log("  " + "-".repeat(columns.join(" | ").length))
+          console.log(`\n  ${columns.join(" | ")}`)
+          console.log(`  ${"-".repeat(columns.join(" | ").length)}`)
 
           // Print rows
           for (const row of sampleResult.rows) {
@@ -124,7 +125,7 @@ async function exploreDatabase() {
               if (typeof val === "object") return JSON.stringify(val).slice(0, 50)
               return String(val).slice(0, 50)
             })
-            console.log("  " + values.join(" | "))
+            console.log(`  ${values.join(" | ")}`)
           }
         }
       }
@@ -185,7 +186,7 @@ async function exploreDatabase() {
       }
     }
 
-    console.log("\n" + "=".repeat(80))
+    console.log(`\n${"=".repeat(80)}`)
     console.log("✅ Exploration complete!")
   } catch (error) {
     console.error("❌ Error exploring database:", error)

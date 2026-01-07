@@ -3,10 +3,11 @@
  * Provides functionality to list tables, describe table schemas, and sample rows
  */
 
-import { dataSourceSecrets, db } from "@/db"
 import { and, eq } from "drizzle-orm"
+import { dataSourceSecrets, db } from "@/db"
 import type { SecretReference } from "./secret-provider.service"
 import { getSecretProvider } from "./secret-provider.service"
+import { validateSqlQuery } from "./sql-validation.service"
 
 /**
  * Table information
@@ -169,7 +170,7 @@ export async function describeTable(
   workspaceId: string,
   tableName: string,
   schemaName: string | undefined,
-  accessToken: string
+  _accessToken: string
 ): Promise<TableSchema> {
   // Check workspace admin role before allowing exploration
   // TODO: Implement proper admin role checking via Usable API
@@ -362,6 +363,12 @@ export async function executeQuery(
   pageSize: number
   totalPages: number
 }> {
+  // Defensive SQL validation (prevents SQL injection even if called directly)
+  const validation = validateSqlQuery(query)
+  if (!validation.valid) {
+    throw new Error(`Invalid SQL query: ${validation.error}`)
+  }
+
   // Validate page and pageSize
   const validatedPage = Math.max(1, page)
   const validatedPageSize = Math.min(Math.max(pageSize, 1), 1000) // Max 1000 rows per page

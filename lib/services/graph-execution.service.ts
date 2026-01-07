@@ -1,9 +1,11 @@
+import { Parser } from "expr-eval"
 import type { DashboardFragmentData } from "./dashboard.service"
 import * as dashboardService from "./dashboard.service"
 import * as databaseExplorationService from "./database-exploration.service"
 import type { GraphFragmentData } from "./graph.service"
 import * as graphService from "./graph.service"
 import { validateParameters } from "./parameter-validation.service"
+import { validateSqlQuery } from "./sql-validation.service"
 
 /**
  * Execute a graph query via worker service
@@ -70,8 +72,21 @@ async function executeSingleQuery(
     throw new Error("Graph query is required for single query execution")
   }
   let queryText = graph.query.text
+
+  // Runtime SQL validation (defensive check even though schema validates)
+  const validation = validateSqlQuery(queryText)
+  if (!validation.valid) {
+    throw new Error(`Invalid SQL query: ${validation.error}`)
+  }
+
   if (graph.timeRange && !disableTimeRange) {
     queryText = injectTimeRangeFilter(queryText, graph.timeRange)
+
+    // Re-validate after time range injection (defensive check)
+    const postInjectionValidation = validateSqlQuery(queryText)
+    if (!postInjectionValidation.valid) {
+      throw new Error(`Invalid SQL query after time range injection: ${postInjectionValidation.error}`)
+    }
   }
 
   // Bind parameters to query safely
@@ -299,9 +314,23 @@ async function executeMultipleQueries(
     if ("dialect" in queryDef && queryDef.dialect === "sql") {
       let queryText = queryDef.text
 
+      // Runtime SQL validation (defensive check even though schema validates)
+      const validation = validateSqlQuery(queryText)
+      if (!validation.valid) {
+        throw new Error(`Invalid SQL query for query ${queryDef.refId}: ${validation.error}`)
+      }
+
       // Inject time range filter if configured and not disabled
       if (graph.timeRange && !disableTimeRange) {
         queryText = injectTimeRangeFilter(queryText, graph.timeRange)
+
+        // Re-validate after time range injection (defensive check)
+        const postInjectionValidation = validateSqlQuery(queryText)
+        if (!postInjectionValidation.valid) {
+          throw new Error(
+            `Invalid SQL query after time range injection for query ${queryDef.refId}: ${postInjectionValidation.error}`
+          )
+        }
       }
 
       // Bind parameters to query
@@ -504,8 +533,11 @@ function evaluateMathExpression(
     // Only evaluate if all referenced queries have values for this date
     if (allValuesPresent) {
       try {
-        // Use Function constructor for safer evaluation
-        const result = new Function(`return ${evalExpr}`)()
+        // Use expr-eval for safe mathematical expression evaluation (prevents code injection)
+        // Create parser instance and evaluate expression safely
+        const parser = new Parser()
+        const expr = parser.parse(evalExpr)
+        const result = expr.evaluate({})
         evaluatedData.push({
           [dateColumn]: date,
           value: result,
@@ -650,10 +682,22 @@ export async function executeQuery(
     }
   }
 
+  // Runtime SQL validation (defensive check)
+  const validation = validateSqlQuery(graphData.query.text)
+  if (!validation.valid) {
+    throw new Error(`Invalid SQL query: ${validation.error}`)
+  }
+
   // Inject time range filter if provided
   let queryText = graphData.query.text
   if (timeRange) {
     queryText = injectTimeRangeFilter(queryText, timeRange)
+
+    // Re-validate after time range injection (defensive check)
+    const postInjectionValidation = validateSqlQuery(queryText)
+    if (!postInjectionValidation.valid) {
+      throw new Error(`Invalid SQL query after time range injection: ${postInjectionValidation.error}`)
+    }
   }
 
   // Bind parameters to query safely
@@ -739,9 +783,23 @@ export async function executeMultipleQueriesPreview(
 
       let queryText = queryDef.text
 
+      // Runtime SQL validation (defensive check)
+      const validation = validateSqlQuery(queryText)
+      if (!validation.valid) {
+        throw new Error(`Invalid SQL query for query ${queryDef.refId}: ${validation.error}`)
+      }
+
       // Inject time range filter if provided
       if (timeRange) {
         queryText = injectTimeRangeFilter(queryText, timeRange)
+
+        // Re-validate after time range injection (defensive check)
+        const postInjectionValidation = validateSqlQuery(queryText)
+        if (!postInjectionValidation.valid) {
+          throw new Error(
+            `Invalid SQL query after time range injection for query ${queryDef.refId}: ${postInjectionValidation.error}`
+          )
+        }
       }
 
       // Bind parameters to query

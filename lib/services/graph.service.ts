@@ -1,8 +1,9 @@
-import type { SessionPathwayBuilder } from "@flowcore/pathways"
 import { randomUUID } from "node:crypto"
+import type { SessionPathwayBuilder } from "@flowcore/pathways"
 import { ulid } from "ulid"
 import { z } from "zod"
 import * as graphContract from "../pathways/contracts/graph.0"
+import { validateSqlQuery } from "./sql-validation.service"
 import { usableApi } from "./usable-api.service"
 
 const GRAPHABLE_VERSION = "0.2.0"
@@ -30,26 +31,82 @@ export type ParameterDefinition = z.infer<typeof parameterDefinitionSchema>
 /**
  * Query definition schema (SQL query)
  */
-const queryDefinitionSchema = z.object({
-  refId: z.string().regex(/^[A-Z]$/, "refId must be a single uppercase letter (A-Z)"),
-  dialect: z.literal("sql"),
-  text: z.string().min(1, "Query text is required"),
-  dataSourceRef: z.string().min(1, "Data source reference is required"),
-  parameters: z.array(parameterDefinitionSchema),
-  name: z.string().optional(), // Custom display name for the query
-  hidden: z.boolean().optional().default(false), // Hide from visualization but still execute
-})
+const queryDefinitionSchema = z
+  .object({
+    refId: z.string().regex(/^[A-Z]$/, "refId must be a single uppercase letter (A-Z)"),
+    dialect: z.literal("sql"),
+    text: z.string().min(1, "Query text is required"),
+    dataSourceRef: z.string().min(1, "Data source reference is required"),
+    parameters: z.array(parameterDefinitionSchema),
+    name: z.string().optional(), // Custom display name for the query
+    hidden: z.boolean().optional().default(false), // Hide from visualization but still execute
+  })
+  .refine(
+    (data) => {
+      // Validate SQL query for security (prevents SQL injection)
+      const validation = validateSqlQuery(data.text)
+      return validation.valid
+    },
+    (data) => {
+      // Return custom error message from validation
+      const validation = validateSqlQuery(data.text)
+      return {
+        message: validation.error || "Invalid SQL query",
+        path: ["text"],
+      }
+    }
+  )
 
 /**
  * Expression definition schema (math operations on queries)
  */
-const expressionDefinitionSchema = z.object({
-  refId: z.string().regex(/^[A-Z]$/, "refId must be a single uppercase letter (A-Z)"),
-  operation: z.enum(["math", "reduce", "resample"]),
-  expression: z.string().min(1, "Expression is required"), // e.g., "$A + $B", "$A * 2"
-  name: z.string().optional(), // Custom display name for the expression
-  hidden: z.boolean().optional().default(false), // Hide from visualization but still execute
-})
+const expressionDefinitionSchema = z
+  .object({
+    refId: z.string().regex(/^[A-Z]$/, "refId must be a single uppercase letter (A-Z)"),
+    operation: z.enum(["math", "reduce", "resample"]),
+    expression: z.string().min(1, "Expression is required"), // e.g., "$A + $B", "$A * 2"
+    name: z.string().optional(), // Custom display name for the expression
+    hidden: z.boolean().optional().default(false), // Hide from visualization but still execute
+  })
+  .refine(
+    (data) => {
+      if (data.operation !== "math") {
+        return true // Only validate math expressions
+      }
+      const expr = data.expression.trim()
+      // Must contain at least one query reference ($A, $B, etc.)
+      if (!/\$[A-Z]/.test(expr)) {
+        return false
+      }
+      // Must not contain dangerous patterns that could lead to code injection
+      // Block: function calls, object access, eval, new Function, etc.
+      const dangerousPatterns = [
+        /alert\s*\(/i,
+        /eval\s*\(/i,
+        /function\s*\(/i,
+        /new\s+Function/i,
+        /\.\s*[a-zA-Z_$]\s*\(/i, // Method calls like .toString()
+        /\[.*\]/i, // Array access
+        /window|document|global|process/i, // Global objects
+        /require\s*\(/i,
+        /import\s+/i,
+        /export\s+/i,
+      ]
+      for (const pattern of dangerousPatterns) {
+        if (pattern.test(expr)) {
+          return false
+        }
+      }
+      // Allow only: numbers, operators, parentheses, whitespace, and $A-$Z references
+      // This regex ensures the expression only contains safe mathematical characters
+      const safePattern = /^[\s\d+\-*/().$A-Z]+$/
+      return safePattern.test(expr)
+    },
+    {
+      message:
+        "Expression must be a valid mathematical expression using query references ($A, $B, etc.) and operators (+, -, *, /). Function calls and other code are not allowed.",
+    }
+  )
 
 /**
  * Query or expression union type
@@ -77,6 +134,21 @@ export const graphFragmentDataSchema = z.object({
       text: z.string().min(1, "Query text is required"),
       parameters: z.array(parameterDefinitionSchema),
     })
+    .refine(
+      (data) => {
+        // Validate SQL query for security (prevents SQL injection)
+        const validation = validateSqlQuery(data.text)
+        return validation.valid
+      },
+      (data) => {
+        // Return custom error message from validation
+        const validation = validateSqlQuery(data.text)
+        return {
+          message: validation.error || "Invalid SQL query",
+          path: ["text"],
+        }
+      }
+    )
     .optional(),
   // New: multiple queries and expressions
   queries: z.array(queryOrExpressionSchema).min(1, "At least one query is required").optional(),

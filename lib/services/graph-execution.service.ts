@@ -800,10 +800,10 @@ export async function executeMultipleQueriesPreview(
   for (const queryDef of sqlQueries) {
     if ("dialect" in queryDef && queryDef.dialect === "sql") {
       // Apply default values for missing optional parameters
-      const parametersWithDefaults: Record<string, unknown> = { ...parameters }
+      const queryParametersWithDefaults: Record<string, unknown> = { ...parameters }
       for (const paramDef of queryDef.parameters || []) {
-        if (parametersWithDefaults[paramDef.name] === undefined && paramDef.default !== undefined) {
-          parametersWithDefaults[paramDef.name] = paramDef.default
+        if (queryParametersWithDefaults[paramDef.name] === undefined && paramDef.default !== undefined) {
+          queryParametersWithDefaults[paramDef.name] = paramDef.default
         }
       }
 
@@ -838,7 +838,7 @@ export async function executeMultipleQueriesPreview(
           required: boolean
           default?: unknown
         }>,
-        parametersWithDefaults
+        queryParametersWithDefaults
       )
 
       // Execute query

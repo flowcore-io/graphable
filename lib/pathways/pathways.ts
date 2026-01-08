@@ -1,5 +1,5 @@
-import { env } from "@/lib/env"
 import { createPostgresPathwayState, NoopLogger, PathwayRouter, PathwaysBuilder } from "@flowcore/pathways"
+import { env } from "@/lib/env"
 import * as dashboardContract from "./contracts/dashboard.0"
 import {
   handlerDashboardCreated,

@@ -9,6 +9,13 @@
  *   - Services emit events via Session Pathways
  *   - Event handlers (if needed) would process events and update state
  *   - No direct db.insert(), db.update(), or db.delete() calls exist in this service
+ *
+ * DATABASE WRITE CLARIFICATION:
+ * - This service NEVER performs direct database writes (db.insert(), db.update(), db.delete())
+ * - All data mutations go through Usable API methods (usableApi.createFragment, usableApi.updateFragment, usableApi.deleteFragment)
+ * - These Usable API methods interact with Usable fragments, NOT the control plane database
+ * - The control plane database is only used for operational data (users, tenant links, permissions, parameters)
+ * - Graph configuration data is stored entirely in Usable fragments as the single source of truth
  */
 import { randomUUID } from "node:crypto"
 import type { SessionPathwayBuilder } from "@flowcore/pathways"

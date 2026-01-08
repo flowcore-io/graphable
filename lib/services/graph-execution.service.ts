@@ -5,6 +5,7 @@ import * as dashboardService from "./dashboard.service"
 import * as databaseExplorationService from "./database-exploration.service"
 import type { GraphFragmentData } from "./graph.service"
 import * as graphService from "./graph.service"
+import { logger } from "./logger.service"
 import { validateParameters } from "./parameter-validation.service"
 import { validateSqlQuery } from "./sql-validation.service"
 
@@ -579,9 +580,11 @@ function evaluateMathExpression(
         })
       } catch (error) {
         // Log error but continue with other dates
-        console.error(
-          `Failed to evaluate expression for date ${date}: ${error instanceof Error ? error.message : "Unknown error"}`
-        )
+        logger.error("Failed to evaluate expression for date", {
+          date,
+          error: error instanceof Error ? error.message : "Unknown error",
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+        })
       }
     }
   }

@@ -5,6 +5,7 @@
 
 import { and, eq } from "drizzle-orm"
 import { dataSourceSecrets, db } from "@/db"
+import { logger } from "./logger.service"
 import type { SecretReference } from "./secret-provider.service"
 import { getSecretProvider } from "./secret-provider.service"
 import { validateSqlQuery } from "./sql-validation.service"
@@ -532,7 +533,12 @@ export async function isWorkspaceAdmin(workspaceId: string, userId: string, _acc
     // User is admin if they are the workspace owner (linked the workspace)
     return tenantLink?.usableUserId === userId
   } catch (error) {
-    console.error("Error checking workspace admin status:", error)
+    logger.error("Error checking workspace admin status", {
+      workspaceId,
+      userId,
+      error: error instanceof Error ? error.message : "Unknown error",
+      errorType: error instanceof Error ? error.constructor.name : typeof error,
+    })
     // Fail closed - return false on error
     return false
   }

@@ -8,6 +8,7 @@ import { dataSourceSecrets, db } from "@/db"
 import type { SecretReference } from "./secret-provider.service"
 import { getSecretProvider } from "./secret-provider.service"
 import { validateSqlQuery } from "./sql-validation.service"
+import { getTenantLinkByWorkspace } from "./tenant.service"
 
 /**
  * Table information
@@ -113,10 +114,17 @@ async function getConnectionConfig(
  * List tables in a data source (admin-only)
  * Connects to PostgreSQL and queries pg_tables
  */
-export async function listTables(dataSourceId: string, workspaceId: string, accessToken: string): Promise<TableInfo[]> {
+export async function listTables(
+  dataSourceId: string,
+  workspaceId: string,
+  userId: string,
+  accessToken: string
+): Promise<TableInfo[]> {
   // Check workspace admin role before allowing exploration
-  // TODO: Implement proper admin role checking via Usable API
-  // For now, we'll allow it but this should be enforced
+  const isAdmin = await isWorkspaceAdmin(workspaceId, userId, accessToken)
+  if (!isAdmin) {
+    throw new Error("Forbidden: Database exploration requires workspace admin access")
+  }
 
   const connectionConfig = await getConnectionConfig(dataSourceId, workspaceId)
 
@@ -170,10 +178,14 @@ export async function describeTable(
   workspaceId: string,
   tableName: string,
   schemaName: string | undefined,
-  _accessToken: string
+  userId: string,
+  accessToken: string
 ): Promise<TableSchema> {
   // Check workspace admin role before allowing exploration
-  // TODO: Implement proper admin role checking via Usable API
+  const isAdmin = await isWorkspaceAdmin(workspaceId, userId, accessToken)
+  if (!isAdmin) {
+    throw new Error("Forbidden: Database exploration requires workspace admin access")
+  }
 
   const connectionConfig = await getConnectionConfig(dataSourceId, workspaceId)
 
@@ -246,11 +258,15 @@ export async function sampleRows(
   workspaceId: string,
   tableName: string,
   schemaName: string | undefined,
-  limit: number = 10,
+  limit: number,
+  userId: string,
   accessToken: string
 ): Promise<unknown[]> {
   // Check workspace admin role before allowing exploration
-  // TODO: Implement proper admin role checking via Usable API
+  const isAdmin = await isWorkspaceAdmin(workspaceId, userId, accessToken)
+  if (!isAdmin) {
+    throw new Error("Forbidden: Database exploration requires workspace admin access")
+  }
 
   // Validate limit parameter (max 100 rows per PRD)
   const validatedLimit = Math.min(Math.max(limit, 1), 100)
@@ -346,15 +362,18 @@ function extractColumnNames(result: { fields?: Array<{ name: string }>; rows: un
 /**
  * Execute a SQL query with pagination
  * Returns paginated results with total count
+ * @param requireAdmin - If true, requires workspace admin access. If false, only requires workspace access (for graph execution)
  */
 export async function executeQuery(
   dataSourceId: string,
   workspaceId: string,
   query: string,
-  page: number = 1,
-  pageSize: number = 50,
+  page: number,
+  pageSize: number,
+  userId: string,
   accessToken: string,
-  preBoundParameters?: unknown[]
+  preBoundParameters?: unknown[],
+  requireAdmin: boolean = true
 ): Promise<{
   rows: unknown[]
   columns: string[]
@@ -363,6 +382,15 @@ export async function executeQuery(
   pageSize: number
   totalPages: number
 }> {
+  // Check workspace admin role before allowing exploration (only if requireAdmin is true)
+  // Graph execution bypasses admin check - authorization is handled at API route level
+  if (requireAdmin) {
+    const isAdmin = await isWorkspaceAdmin(workspaceId, userId, accessToken)
+    if (!isAdmin) {
+      throw new Error("Forbidden: Database exploration requires workspace admin access")
+    }
+  }
+
   // Defensive SQL validation (prevents SQL injection even if called directly)
   const validation = validateSqlQuery(query)
   if (!validation.valid) {
@@ -493,13 +521,19 @@ export async function executeQuery(
 
 /**
  * Check if user is workspace admin
- * TODO: Implement actual admin role check via Usable API
- * For now, returns false (no admin access by default)
- * This should be implemented when Usable API supports workspace role checking
+ * Currently checks if user is the workspace owner (user who linked the workspace)
+ * TODO: When Usable API provides workspace role endpoints, update this to check actual roles
  */
-export async function isWorkspaceAdmin(workspaceId: string, userId: string, accessToken: string): Promise<boolean> {
-  // TODO: Check user role in workspace via Usable API
-  // For MVP, return false (no admin access by default)
-  // This will need to be implemented when Usable API provides workspace role endpoints
-  return false
+export async function isWorkspaceAdmin(workspaceId: string, userId: string, _accessToken: string): Promise<boolean> {
+  try {
+    // Get tenant link for workspace to find the owner
+    const tenantLink = await getTenantLinkByWorkspace(workspaceId)
+
+    // User is admin if they are the workspace owner (linked the workspace)
+    return tenantLink?.usableUserId === userId
+  } catch (error) {
+    console.error("Error checking workspace admin status:", error)
+    // Fail closed - return false on error
+    return false
+  }
 }

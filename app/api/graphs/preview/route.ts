@@ -79,7 +79,7 @@ const previewGraphSchema = z
  * POST /api/graphs/preview
  * Execute a query preview without creating a graph
  */
-export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) => {
+export const POST = requireWorkspace(async (req: NextRequest, { workspaceId, userId }) => {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.accessToken) {
@@ -139,8 +139,12 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) =
         )
       }
       // Multiple queries - use executeMultipleQueriesPreview
+      if (!userId) {
+        return NextResponse.json({ error: "User ID is required" }, { status: 401 })
+      }
       result = await graphExecutionService.executeMultipleQueriesPreview(
         workspaceId,
+        userId,
         {
           queries: queries as Array<
             | {
@@ -174,6 +178,9 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) =
       if (!dataSourceRef) {
         return NextResponse.json({ error: "dataSourceRef is required for single query" }, { status: 400 })
       }
+      if (!userId) {
+        return NextResponse.json({ error: "User ID is required" }, { status: 401 })
+      }
       result = await graphExecutionService.executeQuery(
         workspaceId,
         {
@@ -191,6 +198,7 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) =
           connectorRef,
         },
         effectiveParameters,
+        userId,
         session.user.accessToken,
         timeRange,
         sessionContext.pathway

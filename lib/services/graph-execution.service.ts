@@ -23,6 +23,7 @@ export async function executeGraph(
   workspaceId: string,
   graphId: string, // Fragment ID
   parameters: Record<string, unknown>,
+  userId: string,
   accessToken: string,
   sessionPathway?: GraphExecutionSessionPathway
 ): Promise<{ data: unknown[]; columns: string[] }> {
@@ -60,6 +61,7 @@ export async function executeGraph(
       graph,
       workspaceId,
       parametersWithDefaults,
+      userId,
       accessToken,
       disableTimeRange,
       sessionPathway
@@ -70,6 +72,7 @@ export async function executeGraph(
       graph,
       workspaceId,
       parametersWithDefaults,
+      userId,
       accessToken,
       disableTimeRange,
       sessionPathway
@@ -86,6 +89,7 @@ async function executeSingleQuery(
   graph: GraphFragmentData,
   workspaceId: string,
   parametersWithDefaults: Record<string, unknown>,
+  userId: string,
   accessToken: string,
   disableTimeRange: boolean,
   _sessionPathway?: GraphExecutionSessionPathway
@@ -121,14 +125,17 @@ async function executeSingleQuery(
   )
 
   // Execute query directly using database exploration service
+  // Note: Graph execution bypasses admin check - authorization is handled at API route level
   const result = await databaseExplorationService.executeQuery(
     graph.dataSourceRef,
     workspaceId,
     boundQuery.query,
     1, // page
     1000, // pageSize (max for execution)
+    userId,
     accessToken,
-    boundQuery.parameterValues // Pass pre-bound parameter values
+    boundQuery.parameterValues, // Pass pre-bound parameter values
+    false // requireAdmin = false for graph execution
   )
 
   return {
@@ -320,6 +327,7 @@ async function executeMultipleQueries(
   graph: GraphFragmentData,
   workspaceId: string,
   parametersWithDefaults: Record<string, unknown>,
+  userId: string,
   accessToken: string,
   disableTimeRange: boolean,
   _sessionPathway?: GraphExecutionSessionPathway
@@ -362,14 +370,17 @@ async function executeMultipleQueries(
       const boundQuery = bindParametersToQuery(queryText, queryDef.parameters, parametersWithDefaults)
 
       // Execute query
+      // Note: Graph execution bypasses admin check - authorization is handled at API route level
       const result = await databaseExplorationService.executeQuery(
         queryDef.dataSourceRef || graph.dataSourceRef,
         workspaceId,
         boundQuery.query,
         1,
         1000,
+        userId,
         accessToken,
-        boundQuery.parameterValues
+        boundQuery.parameterValues,
+        false // requireAdmin = false for graph execution
       )
 
       queryResults[queryDef.refId] = {
@@ -695,6 +706,7 @@ export async function executeQuery(
     connectorRef?: string
   },
   parameters: Record<string, unknown>,
+  userId: string,
   accessToken: string,
   timeRange?: "1h" | "7d" | "30d" | "90d" | "180d" | "365d" | "all" | "custom",
   _sessionPathway?: GraphExecutionSessionPathway
@@ -740,14 +752,17 @@ export async function executeQuery(
 
   // Execute query directly using database exploration service
   // This uses the data source's connection to execute the query
+  // Note: Graph execution bypasses admin check - authorization is handled at API route level
   const result = await databaseExplorationService.executeQuery(
     graphData.dataSourceRef,
     workspaceId,
     boundQuery.query,
     1, // page
     1000, // pageSize (max for preview)
+    userId,
     accessToken,
-    boundQuery.parameterValues // Pass pre-bound parameter values
+    boundQuery.parameterValues, // Pass pre-bound parameter values
+    false // requireAdmin = false for graph execution
   )
 
   return {
@@ -762,6 +777,7 @@ export async function executeQuery(
  */
 export async function executeMultipleQueriesPreview(
   workspaceId: string,
+  userId: string,
   graphData: {
     queries: Array<
       | {
@@ -842,14 +858,17 @@ export async function executeMultipleQueriesPreview(
       )
 
       // Execute query
+      // Note: Graph execution bypasses admin check - authorization is handled at API route level
       const result = await databaseExplorationService.executeQuery(
         queryDef.dataSourceRef || graphData.dataSourceRef,
         workspaceId,
         boundQuery.query,
         1,
         1000,
+        userId,
         accessToken,
-        boundQuery.parameterValues
+        boundQuery.parameterValues,
+        false // requireAdmin = false for graph execution
       )
 
       queryResults[queryDef.refId] = {
@@ -884,6 +903,7 @@ export async function executeDashboard(
   workspaceId: string,
   dashboardId: string, // Fragment ID
   globalParameters: Record<string, unknown>,
+  userId: string,
   accessToken: string
 ): Promise<{
   dashboard: DashboardFragmentData
@@ -912,7 +932,7 @@ export async function executeDashboard(
 
       try {
         // Call executeGraph for tile.graphRef
-        const result = await executeGraph(workspaceId, tile.graphRef, mergedParameters, accessToken)
+        const result = await executeGraph(workspaceId, tile.graphRef, mergedParameters, userId, accessToken)
 
         return {
           graphRef: tile.graphRef,

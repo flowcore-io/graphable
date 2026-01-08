@@ -22,7 +22,7 @@ const executeGraphSchema = z.object({
  * Execute a graph query with parameters
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ graphId: string }> }) {
-  return requireWorkspace(async (request: NextRequest, { workspaceId }) => {
+  return requireWorkspace(async (request: NextRequest, { workspaceId, userId }) => {
     try {
       const { graphId } = await params
 
@@ -62,6 +62,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gra
         workspaceId,
         graphId,
         validationResult2.data.parameters || {},
+        userId,
         session.user.accessToken,
         sessionContext.pathway
       )

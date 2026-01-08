@@ -1,6 +1,6 @@
 import { db } from "@/db"
 import { dashboardPermissions, parameterPermissions } from "@/db/schema"
-import { randomUUID } from "crypto"
+import { randomUUID } from "node:crypto"
 import { and, eq } from "drizzle-orm"
 
 /**
@@ -126,9 +126,3 @@ export async function getDashboardPermissions(dashboardId: string) {
 export async function getParameterPermissions(dashboardId: string) {
   return db.select().from(parameterPermissions).where(eq(parameterPermissions.dashboardId, dashboardId))
 }
-
-
-
-
-
-

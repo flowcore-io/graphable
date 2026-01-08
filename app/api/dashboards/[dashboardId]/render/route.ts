@@ -13,7 +13,7 @@ export const runtime = "nodejs"
  * Load dashboard and evaluate all graphs (read-only, no SessionPathway)
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ dashboardId: string }> }) {
-  return requireWorkspace(async (request: NextRequest, { workspaceId }) => {
+  return requireWorkspace(async (_request: NextRequest, { workspaceId }) => {
     try {
       const { dashboardId } = await params
 

@@ -20,7 +20,7 @@ const updateDashboardSchema = dashboardService.updateDashboardInputSchema.extend
  * Get a dashboard by ID
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ dashboardId: string }> }) {
-  return requireWorkspace(async (request: NextRequest, { workspaceId, userId, accessToken }) => {
+  return requireWorkspace(async (_request: NextRequest, { workspaceId, userId: _userId, accessToken }) => {
     try {
       const { dashboardId } = await params
 
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ dash
  * Update a dashboard
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ dashboardId: string }> }) {
-  return requireWorkspace(async (request: NextRequest, { workspaceId, userId, accessToken }) => {
+  return requireWorkspace(async (_request: NextRequest, { workspaceId, userId: _userId, accessToken }) => {
     try {
       const { dashboardId } = await params
 
@@ -76,7 +76,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ dash
       }
 
       // Parse and validate request body
-      const body = await request.json()
+      const body = await req.json()
       console.log("Dashboard update request body:", JSON.stringify(body, null, 2))
 
       const start = Date.now()
@@ -131,7 +131,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ dash
  * Delete a dashboard
  */
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ dashboardId: string }> }) {
-  return requireWorkspace(async (request: NextRequest, { workspaceId, userId, accessToken }) => {
+  return requireWorkspace(async (_request: NextRequest, { workspaceId, userId: _userId, accessToken }) => {
     try {
       const { dashboardId } = await params
 

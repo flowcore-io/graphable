@@ -1,9 +1,19 @@
+import type { SessionPathwayBuilder } from "@flowcore/pathways"
+import { Parser } from "expr-eval"
 import type { DashboardFragmentData } from "./dashboard.service"
 import * as dashboardService from "./dashboard.service"
 import * as databaseExplorationService from "./database-exploration.service"
 import type { GraphFragmentData } from "./graph.service"
 import * as graphService from "./graph.service"
+import { logger } from "./logger.service"
 import { validateParameters } from "./parameter-validation.service"
+import { validateSqlQuery } from "./sql-validation.service"
+
+/**
+ * Type alias for SessionPathwayBuilder used in graph execution functions
+ * Used for auditing graph execution and preview operations
+ */
+type GraphExecutionSessionPathway = SessionPathwayBuilder<Record<string, { input: unknown; output: unknown }>>
 
 /**
  * Execute a graph query via worker service
@@ -14,7 +24,9 @@ export async function executeGraph(
   workspaceId: string,
   graphId: string, // Fragment ID
   parameters: Record<string, unknown>,
-  accessToken: string
+  userId: string,
+  accessToken: string,
+  sessionPathway?: GraphExecutionSessionPathway
 ): Promise<{ data: unknown[]; columns: string[] }> {
   // Get graph fragment from Usable (graphId is the fragment ID)
   const graph = await graphService.getGraph(workspaceId, graphId, accessToken)
@@ -46,10 +58,26 @@ export async function executeGraph(
 
   // Support multiple queries (new) or single query (legacy)
   if (graph.queries && graph.queries.length > 0) {
-    return await executeMultipleQueries(graph, workspaceId, parametersWithDefaults, accessToken, disableTimeRange)
+    return await executeMultipleQueries(
+      graph,
+      workspaceId,
+      parametersWithDefaults,
+      userId,
+      accessToken,
+      disableTimeRange,
+      sessionPathway
+    )
   } else if (graph.query) {
     // Legacy single query support
-    return await executeSingleQuery(graph, workspaceId, parametersWithDefaults, accessToken, disableTimeRange)
+    return await executeSingleQuery(
+      graph,
+      workspaceId,
+      parametersWithDefaults,
+      userId,
+      accessToken,
+      disableTimeRange,
+      sessionPathway
+    )
   } else {
     throw new Error("Graph must have either 'query' or 'queries' defined")
   }
@@ -62,16 +90,31 @@ async function executeSingleQuery(
   graph: GraphFragmentData,
   workspaceId: string,
   parametersWithDefaults: Record<string, unknown>,
+  userId: string,
   accessToken: string,
-  disableTimeRange: boolean
+  disableTimeRange: boolean,
+  _sessionPathway?: GraphExecutionSessionPathway
 ): Promise<{ data: unknown[]; columns: string[] }> {
   // Inject time range filter if configured in graph and not disabled
   if (!graph.query) {
     throw new Error("Graph query is required for single query execution")
   }
   let queryText = graph.query.text
+
+  // Runtime SQL validation (defensive check even though schema validates)
+  const validation = validateSqlQuery(queryText)
+  if (!validation.valid) {
+    throw new Error(`Invalid SQL query: ${validation.error}`)
+  }
+
   if (graph.timeRange && !disableTimeRange) {
     queryText = injectTimeRangeFilter(queryText, graph.timeRange)
+
+    // Re-validate after time range injection (defensive check)
+    const postInjectionValidation = validateSqlQuery(queryText)
+    if (!postInjectionValidation.valid) {
+      throw new Error(`Invalid SQL query after time range injection: ${postInjectionValidation.error}`)
+    }
   }
 
   // Bind parameters to query safely
@@ -83,14 +126,17 @@ async function executeSingleQuery(
   )
 
   // Execute query directly using database exploration service
+  // Note: Graph execution bypasses admin check - authorization is handled at API route level
   const result = await databaseExplorationService.executeQuery(
     graph.dataSourceRef,
     workspaceId,
     boundQuery.query,
     1, // page
     1000, // pageSize (max for execution)
+    userId,
     accessToken,
-    boundQuery.parameterValues // Pass pre-bound parameter values
+    boundQuery.parameterValues, // Pass pre-bound parameter values
+    false // requireAdmin = false for graph execution
   )
 
   return {
@@ -131,13 +177,30 @@ function combineQueryResults(
   }
 
   // Helper function to get display name for a column
-  const getColumnDisplayName = (refId: string, columnName: string, queryDef?: { name?: string }): string => {
+  // Custom query name should only be used when there's a single value column (for time series)
+  // For SELECT * queries with multiple columns, preserve original column names
+  const getColumnDisplayName = (
+    refId: string,
+    columnName: string,
+    queryDef?: { name?: string },
+    totalColumns?: number
+  ): string => {
     const queryName = queryDef?.name
-    if (queryName) {
-      // Use custom name if provided
+
+    // For SELECT * queries with many columns, preserve original column names
+    if (totalColumns && totalColumns > 2) {
+      return columnName
+    }
+
+    // Only use custom name if:
+    // 1. Query has a custom name
+    // 2. There are exactly 2 columns (date + value) - typical time series pattern
+    if (queryName && totalColumns === 2) {
+      // Use custom name for the value column (second column)
       return queryName
     }
-    // Fallback to refId_columnName
+
+    // Fallback to refId_columnName for single queries without custom name
     return `${refId}_${columnName}`
   }
 
@@ -149,17 +212,19 @@ function combineQueryResults(
     if (!result) {
       return { data: [], columns: [] }
     }
-    // Prefix numeric columns (all except first) with custom name or refId
+    // For SELECT * queries with many columns, preserve original column names
+    // Only apply custom name for time series (2 columns: date + value)
+    const totalColumns = result.columns.length
     const prefixedColumns = result.columns.map((col, index) => {
       if (index === 0) return col // Keep first column as-is (usually date)
-      return getColumnDisplayName(refId, col, queryDef)
+      return getColumnDisplayName(refId, col, queryDef, totalColumns)
     })
     const prefixedData = result.data.map((row) => {
       if (typeof row !== "object" || row === null) return row
       const rowObj = row as Record<string, unknown>
       const prefixedRow: Record<string, unknown> = {}
       result.columns.forEach((col, index) => {
-        const newColName = index === 0 ? col : getColumnDisplayName(refId, col, queryDef)
+        const newColName = index === 0 ? col : getColumnDisplayName(refId, col, queryDef, totalColumns)
         prefixedRow[newColName] = rowObj[col]
       })
       return prefixedRow
@@ -201,9 +266,11 @@ function combineQueryResults(
     const result = queryResults[refId]
     if (!result) continue
     // Add all columns except the first (date) with custom name or refId prefix
+    // For SELECT * queries with many columns, preserve original column names
+    const totalColumns = result.columns.length
     for (let i = 1; i < result.columns.length; i++) {
       const col = result.columns[i]
-      combinedColumns.push(getColumnDisplayName(refId, col, queryDef))
+      combinedColumns.push(getColumnDisplayName(refId, col, queryDef, totalColumns))
     }
   }
 
@@ -230,16 +297,19 @@ function combineQueryResults(
       if (matchingRow && typeof matchingRow === "object" && matchingRow !== null) {
         const rowObj = matchingRow as Record<string, unknown>
         // Copy all columns except the first (date) with custom name or refId prefix
+        // For SELECT * queries with many columns, preserve original column names
+        const totalColumns = result.columns.length
         for (let i = 1; i < result.columns.length; i++) {
           const col = result.columns[i]
-          const displayName = getColumnDisplayName(refId, col, queryDef)
+          const displayName = getColumnDisplayName(refId, col, queryDef, totalColumns)
           combinedRow[displayName] = rowObj[col]
         }
       } else {
         // No matching row - fill with null
+        const totalColumns = result.columns.length
         for (let i = 1; i < result.columns.length; i++) {
           const col = result.columns[i]
-          const displayName = getColumnDisplayName(refId, col, queryDef)
+          const displayName = getColumnDisplayName(refId, col, queryDef, totalColumns)
           combinedRow[displayName] = null
         }
       }
@@ -258,8 +328,10 @@ async function executeMultipleQueries(
   graph: GraphFragmentData,
   workspaceId: string,
   parametersWithDefaults: Record<string, unknown>,
+  userId: string,
   accessToken: string,
-  disableTimeRange: boolean
+  disableTimeRange: boolean,
+  _sessionPathway?: GraphExecutionSessionPathway
 ): Promise<{ data: unknown[]; columns: string[] }> {
   if (!graph.queries || graph.queries.length === 0) {
     throw new Error("Graph queries are required for multiple query execution")
@@ -275,9 +347,23 @@ async function executeMultipleQueries(
     if ("dialect" in queryDef && queryDef.dialect === "sql") {
       let queryText = queryDef.text
 
+      // Runtime SQL validation (defensive check even though schema validates)
+      const validation = validateSqlQuery(queryText)
+      if (!validation.valid) {
+        throw new Error(`Invalid SQL query for query ${queryDef.refId}: ${validation.error}`)
+      }
+
       // Inject time range filter if configured and not disabled
       if (graph.timeRange && !disableTimeRange) {
         queryText = injectTimeRangeFilter(queryText, graph.timeRange)
+
+        // Re-validate after time range injection (defensive check)
+        const postInjectionValidation = validateSqlQuery(queryText)
+        if (!postInjectionValidation.valid) {
+          throw new Error(
+            `Invalid SQL query after time range injection for query ${queryDef.refId}: ${postInjectionValidation.error}`
+          )
+        }
       }
 
       // Bind parameters to query
@@ -285,14 +371,17 @@ async function executeMultipleQueries(
       const boundQuery = bindParametersToQuery(queryText, queryDef.parameters, parametersWithDefaults)
 
       // Execute query
+      // Note: Graph execution bypasses admin check - authorization is handled at API route level
       const result = await databaseExplorationService.executeQuery(
         queryDef.dataSourceRef || graph.dataSourceRef,
         workspaceId,
         boundQuery.query,
         1,
         1000,
+        userId,
         accessToken,
-        boundQuery.parameterValues
+        boundQuery.parameterValues,
+        false // requireAdmin = false for graph execution
       )
 
       queryResults[queryDef.refId] = {
@@ -480,17 +569,22 @@ function evaluateMathExpression(
     // Only evaluate if all referenced queries have values for this date
     if (allValuesPresent) {
       try {
-        // Use Function constructor for safer evaluation
-        const result = new Function(`return ${evalExpr}`)()
+        // Use expr-eval for safe mathematical expression evaluation (prevents code injection)
+        // Create parser instance and evaluate expression safely
+        const parser = new Parser()
+        const expr = parser.parse(evalExpr)
+        const result = expr.evaluate({})
         evaluatedData.push({
           [dateColumn]: date,
           value: result,
         })
       } catch (error) {
         // Log error but continue with other dates
-        console.error(
-          `Failed to evaluate expression for date ${date}: ${error instanceof Error ? error.message : "Unknown error"}`
-        )
+        logger.error("Failed to evaluate expression for date", {
+          date,
+          error: error instanceof Error ? error.message : "Unknown error",
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+        })
       }
     }
   }
@@ -557,9 +651,11 @@ function injectTimeRangeFilter(
     }
   }
 
-  // Default to "created_at" if no column found
+  // If no date column found, skip time range filtering (graceful fallback)
+  // This follows the pattern in database-exploration.service.ts where queries
+  // gracefully fall back when assumptions can't be made about schema
   if (!dateColumn) {
-    dateColumn = "created_at"
+    return queryText
   }
 
   // Calculate the date threshold
@@ -613,8 +709,10 @@ export async function executeQuery(
     connectorRef?: string
   },
   parameters: Record<string, unknown>,
+  userId: string,
   accessToken: string,
-  timeRange?: "1h" | "7d" | "30d" | "90d" | "180d" | "365d" | "all" | "custom"
+  timeRange?: "1h" | "7d" | "30d" | "90d" | "180d" | "365d" | "all" | "custom",
+  _sessionPathway?: GraphExecutionSessionPathway
 ): Promise<{ data: unknown[]; columns: string[] }> {
   // Apply default values for missing optional parameters
   const parametersWithDefaults: Record<string, unknown> = { ...parameters }
@@ -624,10 +722,22 @@ export async function executeQuery(
     }
   }
 
+  // Runtime SQL validation (defensive check)
+  const validation = validateSqlQuery(graphData.query.text)
+  if (!validation.valid) {
+    throw new Error(`Invalid SQL query: ${validation.error}`)
+  }
+
   // Inject time range filter if provided
   let queryText = graphData.query.text
   if (timeRange) {
     queryText = injectTimeRangeFilter(queryText, timeRange)
+
+    // Re-validate after time range injection (defensive check)
+    const postInjectionValidation = validateSqlQuery(queryText)
+    if (!postInjectionValidation.valid) {
+      throw new Error(`Invalid SQL query after time range injection: ${postInjectionValidation.error}`)
+    }
   }
 
   // Bind parameters to query safely
@@ -645,14 +755,17 @@ export async function executeQuery(
 
   // Execute query directly using database exploration service
   // This uses the data source's connection to execute the query
+  // Note: Graph execution bypasses admin check - authorization is handled at API route level
   const result = await databaseExplorationService.executeQuery(
     graphData.dataSourceRef,
     workspaceId,
     boundQuery.query,
     1, // page
     1000, // pageSize (max for preview)
+    userId,
     accessToken,
-    boundQuery.parameterValues // Pass pre-bound parameter values
+    boundQuery.parameterValues, // Pass pre-bound parameter values
+    false // requireAdmin = false for graph execution
   )
 
   return {
@@ -667,6 +780,7 @@ export async function executeQuery(
  */
 export async function executeMultipleQueriesPreview(
   workspaceId: string,
+  userId: string,
   graphData: {
     queries: Array<
       | {
@@ -692,7 +806,8 @@ export async function executeMultipleQueriesPreview(
   },
   parameters: Record<string, unknown>,
   accessToken: string,
-  timeRange?: "1h" | "7d" | "30d" | "90d" | "180d" | "365d" | "all" | "custom"
+  timeRange?: "1h" | "7d" | "30d" | "90d" | "180d" | "365d" | "all" | "custom",
+  _sessionPathway?: GraphExecutionSessionPathway
 ): Promise<{ data: unknown[]; columns: string[] }> {
   // Separate queries and expressions
   const sqlQueries = graphData.queries.filter((q) => "dialect" in q && q.dialect === "sql")
@@ -704,18 +819,32 @@ export async function executeMultipleQueriesPreview(
   for (const queryDef of sqlQueries) {
     if ("dialect" in queryDef && queryDef.dialect === "sql") {
       // Apply default values for missing optional parameters
-      const parametersWithDefaults: Record<string, unknown> = { ...parameters }
+      const queryParametersWithDefaults: Record<string, unknown> = { ...parameters }
       for (const paramDef of queryDef.parameters || []) {
-        if (parametersWithDefaults[paramDef.name] === undefined && paramDef.default !== undefined) {
-          parametersWithDefaults[paramDef.name] = paramDef.default
+        if (queryParametersWithDefaults[paramDef.name] === undefined && paramDef.default !== undefined) {
+          queryParametersWithDefaults[paramDef.name] = paramDef.default
         }
       }
 
       let queryText = queryDef.text
 
+      // Runtime SQL validation (defensive check)
+      const validation = validateSqlQuery(queryText)
+      if (!validation.valid) {
+        throw new Error(`Invalid SQL query for query ${queryDef.refId}: ${validation.error}`)
+      }
+
       // Inject time range filter if provided
       if (timeRange) {
         queryText = injectTimeRangeFilter(queryText, timeRange)
+
+        // Re-validate after time range injection (defensive check)
+        const postInjectionValidation = validateSqlQuery(queryText)
+        if (!postInjectionValidation.valid) {
+          throw new Error(
+            `Invalid SQL query after time range injection for query ${queryDef.refId}: ${postInjectionValidation.error}`
+          )
+        }
       }
 
       // Bind parameters to query
@@ -728,18 +857,21 @@ export async function executeMultipleQueriesPreview(
           required: boolean
           default?: unknown
         }>,
-        parametersWithDefaults
+        queryParametersWithDefaults
       )
 
       // Execute query
+      // Note: Graph execution bypasses admin check - authorization is handled at API route level
       const result = await databaseExplorationService.executeQuery(
         queryDef.dataSourceRef || graphData.dataSourceRef,
         workspaceId,
         boundQuery.query,
         1,
         1000,
+        userId,
         accessToken,
-        boundQuery.parameterValues
+        boundQuery.parameterValues,
+        false // requireAdmin = false for graph execution
       )
 
       queryResults[queryDef.refId] = {
@@ -774,6 +906,7 @@ export async function executeDashboard(
   workspaceId: string,
   dashboardId: string, // Fragment ID
   globalParameters: Record<string, unknown>,
+  userId: string,
   accessToken: string
 ): Promise<{
   dashboard: DashboardFragmentData
@@ -802,7 +935,7 @@ export async function executeDashboard(
 
       try {
         // Call executeGraph for tile.graphRef
-        const result = await executeGraph(workspaceId, tile.graphRef, mergedParameters, accessToken)
+        const result = await executeGraph(workspaceId, tile.graphRef, mergedParameters, userId, accessToken)
 
         return {
           graphRef: tile.graphRef,

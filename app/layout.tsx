@@ -20,6 +20,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 })
 
+export const dynamic = "force-dynamic"
+
 export const metadata: Metadata = {
   title: "Graphable - AI-first Graphical Service",
   description: "Create, manage, and visualize your data with AI-powered graphs and dashboards",

@@ -360,163 +360,154 @@ export default function EditDataSourcePage() {
 
               <div className="space-y-2">
                 <Label>
-                  {hasSecret
-                    ? "Connection Details (Optional - only if updating secret value)"
-                    : "Connection Details *"}
+                  {hasSecret ? "Connection Details (Optional - only if updating secret value)" : "Connection Details *"}
                 </Label>
                 <Tabs
                   value={connectionInputType}
                   onValueChange={(v) => setConnectionInputType(v as "string" | "split")}
                 >
-                    <TabsList variant="line" className="grid w-full grid-cols-2">
-                      <TabsTrigger value="string">Connection String</TabsTrigger>
-                      <TabsTrigger value="split">Split Input</TabsTrigger>
-                    </TabsList>
+                  <TabsList variant="line" className="grid w-full grid-cols-2">
+                    <TabsTrigger value="string">Connection String</TabsTrigger>
+                    <TabsTrigger value="split">Split Input</TabsTrigger>
+                  </TabsList>
 
-                    <TabsContent value="string" className="space-y-2 mt-4">
-                      <Textarea
-                        id="connectionString"
-                        placeholder="postgresql://user:password@host:port/database?sslmode=require"
-                        value={connectionString}
-                        onChange={(e) => setConnectionString(e.target.value)}
-                        rows={3}
+                  <TabsContent value="string" className="space-y-2 mt-4">
+                    <Textarea
+                      id="connectionString"
+                      placeholder="postgresql://user:password@host:port/database?sslmode=require"
+                      value={connectionString}
+                      onChange={(e) => setConnectionString(e.target.value)}
+                      rows={3}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {hasSecret
+                        ? "Leave empty to keep existing secret. Paste new connection string to update secret value."
+                        : "Paste connection string to create a new secret."}
+                    </p>
+                    {connectionString.trim() && (
+                      <div className="space-y-2 rounded-lg border border-border bg-muted/50 p-3">
+                        <Label className="text-xs font-medium">Connection String Preview</Label>
+                        <div className="font-mono text-xs break-all text-muted-foreground">
+                          {connectionString.replace(/:[^:@]+@/, ":••••••••@")}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Password is hidden for security. This is what will be stored.
+                        </p>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="split" className="space-y-4 mt-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="host">Host *</Label>
+                        <Input
+                          id="host"
+                          placeholder="localhost"
+                          value={host}
+                          onChange={(e) => setHost(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="port">Port</Label>
+                        <Input
+                          id="port"
+                          type="number"
+                          placeholder="5432"
+                          value={port}
+                          onChange={(e) => setPort(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="database">Database *</Label>
+                      <Input
+                        id="database"
+                        placeholder="mydb"
+                        value={database}
+                        onChange={(e) => setDatabase(e.target.value)}
                       />
-                      <p className="text-xs text-muted-foreground">
-                        {hasSecret
-                          ? "Leave empty to keep existing secret. Paste new connection string to update secret value."
-                          : "Paste connection string to create a new secret."}
-                      </p>
-                      {connectionString.trim() && (
-                        <div className="space-y-2 rounded-lg border border-border bg-muted/50 p-3">
-                          <Label className="text-xs font-medium">Connection String Preview</Label>
-                          <div className="font-mono text-xs break-all text-muted-foreground">
-                            {connectionString.replace(/:[^:@]+@/, ":••••••••@")}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Password is hidden for security. This is what will be stored.
-                          </p>
-                        </div>
-                      )}
-                    </TabsContent>
-
-                    <TabsContent value="split" className="space-y-4 mt-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="host">Host *</Label>
-                          <Input
-                            id="host"
-                            placeholder="localhost"
-                            value={host}
-                            onChange={(e) => setHost(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="port">Port</Label>
-                          <Input
-                            id="port"
-                            type="number"
-                            placeholder="5432"
-                            value={port}
-                            onChange={(e) => setPort(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="database">Database *</Label>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="user">Username *</Label>
+                      <Input id="user" placeholder="postgres" value={user} onChange={(e) => setUser(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password *</Label>
+                      <div className="relative">
                         <Input
-                          id="database"
-                          placeholder="mydb"
-                          value={database}
-                          onChange={(e) => setDatabase(e.target.value)}
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="pr-10"
                         />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? (
+                            <EyeOffIcon className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <EyeIcon className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="user">Username *</Label>
-                        <Input
-                          id="user"
-                          placeholder="postgres"
-                          value={user}
-                          onChange={(e) => setUser(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="password">Password *</Label>
-                        <div className="relative">
-                          <Input
-                            id="password"
-                            type={showPassword ? "text" : "password"}
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="pr-10"
-                          />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sslMode">SSL Mode</Label>
+                      <Select value={sslMode} onValueChange={(value) => setSslMode(value as typeof sslMode)}>
+                        <SelectTrigger id="sslMode" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="w-[var(--radix-select-trigger-width)] min-w-[400px]">
+                          <SelectItem value="disable">Disable - No SSL</SelectItem>
+                          <SelectItem value="allow">Allow - Try non-SSL first, then SSL</SelectItem>
+                          <SelectItem value="prefer">Prefer - Try SSL first, then non-SSL (default)</SelectItem>
+                          <SelectItem value="require">Require - SSL required, but don't verify certificate</SelectItem>
+                          <SelectItem value="verify-ca">
+                            Verify-CA - SSL required, verify certificate authority
+                          </SelectItem>
+                          <SelectItem value="verify-full">
+                            Verify-Full - SSL required, verify certificate and hostname
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">Controls SSL/TLS encryption for the connection</p>
+                    </div>
+                    {buildConnectionString() && (
+                      <div className="space-y-2 rounded-lg border border-border bg-muted/50 p-3">
+                        <Label className="text-xs font-medium">Generated Connection String</Label>
+                        <div className="font-mono text-xs break-all text-muted-foreground">
+                          {showPassword
+                            ? buildConnectionString()
+                            : buildConnectionString().replace(/:[^:@]+@/, ":••••••••@")}
+                        </div>
+                        <div className="flex items-center gap-2">
                           <Button
                             type="button"
                             variant="ghost"
-                            size="icon"
-                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            size="sm"
+                            className="h-6 text-xs"
                             onClick={() => setShowPassword(!showPassword)}
                           >
-                            {showPassword ? (
-                              <EyeOffIcon className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <EyeIcon className="h-4 w-4 text-muted-foreground" />
-                            )}
+                            {showPassword ? "Hide" : "Show"} Password
                           </Button>
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="sslMode">SSL Mode</Label>
-                        <Select value={sslMode} onValueChange={(value) => setSslMode(value as typeof sslMode)}>
-                          <SelectTrigger id="sslMode" className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="w-[var(--radix-select-trigger-width)] min-w-[400px]">
-                            <SelectItem value="disable">Disable - No SSL</SelectItem>
-                            <SelectItem value="allow">Allow - Try non-SSL first, then SSL</SelectItem>
-                            <SelectItem value="prefer">Prefer - Try SSL first, then non-SSL (default)</SelectItem>
-                            <SelectItem value="require">
-                              Require - SSL required, but don't verify certificate
-                            </SelectItem>
-                            <SelectItem value="verify-ca">
-                              Verify-CA - SSL required, verify certificate authority
-                            </SelectItem>
-                            <SelectItem value="verify-full">
-                              Verify-Full - SSL required, verify certificate and hostname
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">Controls SSL/TLS encryption for the connection</p>
-                      </div>
-                      {buildConnectionString() && (
-                        <div className="space-y-2 rounded-lg border border-border bg-muted/50 p-3">
-                          <Label className="text-xs font-medium">Generated Connection String</Label>
-                          <div className="font-mono text-xs break-all text-muted-foreground">
-                            {showPassword
-                              ? buildConnectionString()
-                              : buildConnectionString().replace(/:[^:@]+@/, ":••••••••@")}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 text-xs"
-                              onClick={() => setShowPassword(!showPassword)}
-                            >
-                              {showPassword ? "Hide" : "Show"} Password
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        {hasSecret
-                          ? "Leave empty to keep existing secret. Fill fields to update secret value."
-                          : "Fill fields to create a new secret."}
-                      </p>
-                    </TabsContent>
-                  </Tabs>
-                </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {hasSecret
+                        ? "Leave empty to keep existing secret. Fill fields to update secret value."
+                        : "Fill fields to create a new secret."}
+                    </p>
+                  </TabsContent>
+                </Tabs>
+              </div>
 
               {getFinalConnectionString() && (
                 <div className="space-y-2 pt-2">

@@ -10,7 +10,7 @@ import { useWorkspace } from "@/lib/context/workspace-context"
 import { ArrowLeftIcon } from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 
 interface Folder {
   id: string
@@ -18,7 +18,7 @@ interface Folder {
   parentFolderId?: string | null
 }
 
-export default function NewDashboardPage() {
+function NewDashboardContent() {
   const { workspaceId } = useWorkspace()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -212,5 +212,23 @@ export default function NewDashboardPage() {
         </Card>
       </main>
     </div>
+  )
+}
+
+export default function NewDashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background">
+          <main className="container mx-auto px-4 py-8">
+            <div className="flex items-center justify-center min-h-[60vh]">
+              <div className="text-muted-foreground">Loading...</div>
+            </div>
+          </main>
+        </div>
+      }
+    >
+      <NewDashboardContent />
+    </Suspense>
   )
 }

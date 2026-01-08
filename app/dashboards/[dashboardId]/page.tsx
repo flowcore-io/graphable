@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils"
 import { getServerSession } from "next-auth"
 import Link from "next/link"
 
+export const dynamic = "force-dynamic"
+
 export default async function DashboardViewPage({ params }: { params: Promise<{ dashboardId: string }> }) {
   const { dashboardId } = await params
 

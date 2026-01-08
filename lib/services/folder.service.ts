@@ -1,5 +1,5 @@
 import type { SessionPathwayBuilder } from "@flowcore/pathways"
-import { randomUUID } from "crypto"
+import { randomUUID } from "node:crypto"
 import { ulid } from "ulid"
 import { z } from "zod"
 import * as folderContract from "../pathways/contracts/folder.0"

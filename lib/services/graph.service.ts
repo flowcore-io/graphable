@@ -1,12 +1,47 @@
+/**
+ * Graph Service - Graph Fragment Management
+ *
+ * ARCHITECTURAL COMPLIANCE:
+ * - All operations use Usable API (fragments) as the persistent store - NO direct database writes
+ * - All mutations (create, update, delete) emit events via Session Pathways for audit tracking
+ * - Read operations (get, list) query Usable fragments directly - no cache layer
+ * - This service follows the event-driven architecture pattern where:
+ *   - Services emit events via Session Pathways
+ *   - Event handlers (if needed) would process events and update state
+ *   - No direct db.insert(), db.update(), or db.delete() calls exist in this service
+ *
+ * DATABASE WRITE CLARIFICATION:
+ * - This service NEVER performs direct database writes (db.insert(), db.update(), db.delete())
+ * - All data mutations go through Usable API methods (usableApi.createFragment, usableApi.updateFragment, usableApi.deleteFragment)
+ * - These Usable API methods interact with Usable fragments, NOT the control plane database
+ * - The control plane database is only used for operational data (users, tenant links, permissions, parameters)
+ * - Graph configuration data is stored entirely in Usable fragments as the single source of truth
+ */
+import { randomUUID } from "node:crypto"
 import type { SessionPathwayBuilder } from "@flowcore/pathways"
-import { randomUUID } from "crypto"
 import { ulid } from "ulid"
 import { z } from "zod"
 import * as graphContract from "../pathways/contracts/graph.0"
+import { validateSqlQuery } from "./sql-validation.service"
 import { usableApi } from "./usable-api.service"
 
 const GRAPHABLE_VERSION = "0.2.0"
 const GRAPHABLE_APP_TAG = "app:graphable"
+
+/**
+ * Type alias for SessionPathwayBuilder used in graph service mutation functions
+ * Used for emitting graph lifecycle events (created, updated, deleted)
+ */
+type GraphServiceSessionPathway = SessionPathwayBuilder<Record<string, { input: unknown; output: unknown }>>
+
+/**
+ * Type for SessionPathway with write() and getUserResolver() methods
+ * These methods exist at runtime but use a more specific type than the base SessionPathwayBuilder
+ */
+type TypedSessionPathway = GraphServiceSessionPathway & {
+  write(eventType: string, payload: { data: Record<string, unknown> }): Promise<string | string[]>
+  getUserResolver?: () => Promise<{ entityId: string; entityType: string }>
+}
 
 /**
  * Zod schema for parameter definition
@@ -30,26 +65,82 @@ export type ParameterDefinition = z.infer<typeof parameterDefinitionSchema>
 /**
  * Query definition schema (SQL query)
  */
-const queryDefinitionSchema = z.object({
-  refId: z.string().regex(/^[A-Z]$/, "refId must be a single uppercase letter (A-Z)"),
-  dialect: z.literal("sql"),
-  text: z.string().min(1, "Query text is required"),
-  dataSourceRef: z.string().min(1, "Data source reference is required"),
-  parameters: z.array(parameterDefinitionSchema),
-  name: z.string().optional(), // Custom display name for the query
-  hidden: z.boolean().optional().default(false), // Hide from visualization but still execute
-})
+const queryDefinitionSchema = z
+  .object({
+    refId: z.string().regex(/^[A-Z]$/, "refId must be a single uppercase letter (A-Z)"),
+    dialect: z.literal("sql"),
+    text: z.string().min(1, "Query text is required"),
+    dataSourceRef: z.string().min(1, "Data source reference is required"),
+    parameters: z.array(parameterDefinitionSchema),
+    name: z.string().optional(), // Custom display name for the query
+    hidden: z.boolean().optional().default(false), // Hide from visualization but still execute
+  })
+  .refine(
+    (data) => {
+      // Validate SQL query for security (prevents SQL injection)
+      const validation = validateSqlQuery(data.text)
+      return validation.valid
+    },
+    (data) => {
+      // Return custom error message from validation
+      const validation = validateSqlQuery(data.text)
+      return {
+        message: validation.error || "Invalid SQL query",
+        path: ["text"],
+      }
+    }
+  )
 
 /**
  * Expression definition schema (math operations on queries)
  */
-const expressionDefinitionSchema = z.object({
-  refId: z.string().regex(/^[A-Z]$/, "refId must be a single uppercase letter (A-Z)"),
-  operation: z.enum(["math", "reduce", "resample"]),
-  expression: z.string().min(1, "Expression is required"), // e.g., "$A + $B", "$A * 2"
-  name: z.string().optional(), // Custom display name for the expression
-  hidden: z.boolean().optional().default(false), // Hide from visualization but still execute
-})
+const expressionDefinitionSchema = z
+  .object({
+    refId: z.string().regex(/^[A-Z]$/, "refId must be a single uppercase letter (A-Z)"),
+    operation: z.enum(["math", "reduce", "resample"]),
+    expression: z.string().min(1, "Expression is required"), // e.g., "$A + $B", "$A * 2"
+    name: z.string().optional(), // Custom display name for the expression
+    hidden: z.boolean().optional().default(false), // Hide from visualization but still execute
+  })
+  .refine(
+    (data) => {
+      if (data.operation !== "math") {
+        return true // Only validate math expressions
+      }
+      const expr = data.expression.trim()
+      // Must contain at least one query reference ($A, $B, etc.)
+      if (!/\$[A-Z]/.test(expr)) {
+        return false
+      }
+      // Must not contain dangerous patterns that could lead to code injection
+      // Block: function calls, object access, eval, new Function, etc.
+      const dangerousPatterns = [
+        /alert\s*\(/i,
+        /eval\s*\(/i,
+        /function\s*\(/i,
+        /new\s+Function/i,
+        /\.\s*[a-zA-Z_$]\s*\(/i, // Method calls like .toString()
+        /\[.*\]/i, // Array access
+        /window|document|global|process/i, // Global objects
+        /require\s*\(/i,
+        /import\s+/i,
+        /export\s+/i,
+      ]
+      for (const pattern of dangerousPatterns) {
+        if (pattern.test(expr)) {
+          return false
+        }
+      }
+      // Allow only: numbers, operators, parentheses, whitespace, and $A-$Z references
+      // This regex ensures the expression only contains safe mathematical characters
+      const safePattern = /^[\s\d+\-*/().$A-Z]+$/
+      return safePattern.test(expr)
+    },
+    {
+      message:
+        "Expression must be a valid mathematical expression using query references ($A, $B, etc.) and operators (+, -, *, /). Function calls and other code are not allowed.",
+    }
+  )
 
 /**
  * Query or expression union type
@@ -77,6 +168,21 @@ export const graphFragmentDataSchema = z.object({
       text: z.string().min(1, "Query text is required"),
       parameters: z.array(parameterDefinitionSchema),
     })
+    .refine(
+      (data) => {
+        // Validate SQL query for security (prevents SQL injection)
+        const validation = validateSqlQuery(data.text)
+        return validation.valid
+      },
+      (data) => {
+        // Return custom error message from validation
+        const validation = validateSqlQuery(data.text)
+        return {
+          message: validation.error || "Invalid SQL query",
+          path: ["text"],
+        }
+      }
+    )
     .optional(),
   // New: multiple queries and expressions
   queries: z.array(queryOrExpressionSchema).min(1, "At least one query is required").optional(),
@@ -161,7 +267,7 @@ export type UpdateGraphInput = z.infer<typeof updateGraphInputSchema>
  * Mutation function - requires SessionPathway
  */
 export async function createGraph(
-  sessionPathway: SessionPathwayBuilder<any>,
+  sessionPathway: GraphServiceSessionPathway,
   workspaceId: string,
   graphData: CreateGraphInput,
   accessToken: string
@@ -260,7 +366,7 @@ export async function createGraph(
     queriesCount: validatedContent.queries?.length || 0,
     fragmentInput: {
       ...fragmentInput,
-      content: fragmentInput.content.substring(0, 500) + "...", // Truncate for logging
+      content: `${fragmentInput.content.substring(0, 500)}...`, // Truncate for logging
     },
   })
 
@@ -270,23 +376,19 @@ export async function createGraph(
   const graphId = fragment.id
 
   // Emit graph.created.0 event via Session Pathways
-  await (sessionPathway as any).write(
-    `${graphContract.FlowcoreGraph.flowType}/${graphContract.FlowcoreGraph.eventType.created}`,
-    {
-      data: {
-        graphId, // Fragment ID
-        fragmentId: graphId, // Same as graphId
-        workspaceId,
-        dataSourceRef: finalDataSourceRef, // Use validated/derived dataSourceRef
-        connectorRef: validatedData.connectorRef,
-        occurredAt: new Date().toISOString(),
-        initiatedBy: (sessionPathway as any).getUserResolver
-          ? (await (sessionPathway as any).getUserResolver()).entityId
-          : "system",
-        requestId: randomUUID(),
-      },
-    }
-  )
+  const typedPathway = sessionPathway as TypedSessionPathway
+  await typedPathway.write(`${graphContract.FlowcoreGraph.flowType}/${graphContract.FlowcoreGraph.eventType.created}`, {
+    data: {
+      graphId, // Fragment ID
+      fragmentId: graphId, // Same as graphId
+      workspaceId,
+      dataSourceRef: finalDataSourceRef, // Use validated/derived dataSourceRef
+      connectorRef: validatedData.connectorRef,
+      occurredAt: new Date().toISOString(),
+      initiatedBy: typedPathway.getUserResolver ? (await typedPathway.getUserResolver()).entityId : "system",
+      requestId: randomUUID(),
+    },
+  })
 
   return { graphId, status: "processing" }
 }
@@ -296,7 +398,7 @@ export async function createGraph(
  * Mutation function - requires SessionPathway
  */
 export async function updateGraph(
-  sessionPathway: SessionPathwayBuilder<any>,
+  sessionPathway: GraphServiceSessionPathway,
   workspaceId: string,
   graphId: string, // Fragment ID
   graphData: UpdateGraphInput,
@@ -354,23 +456,19 @@ export async function updateGraph(
   )
 
   // Emit graph.updated.0 event via Session Pathways
-  await (sessionPathway as any).write(
-    `${graphContract.FlowcoreGraph.flowType}/${graphContract.FlowcoreGraph.eventType.updated}`,
-    {
-      data: {
-        graphId, // Fragment ID
-        fragmentId: graphId, // Same as graphId
-        workspaceId,
-        dataSourceRef: validatedUpdatedData.dataSourceRef,
-        connectorRef: validatedUpdatedData.connectorRef,
-        occurredAt: new Date().toISOString(),
-        initiatedBy: (sessionPathway as any).getUserResolver
-          ? (await (sessionPathway as any).getUserResolver()).entityId
-          : "system",
-        requestId: randomUUID(),
-      },
-    }
-  )
+  const typedPathway = sessionPathway as TypedSessionPathway
+  await typedPathway.write(`${graphContract.FlowcoreGraph.flowType}/${graphContract.FlowcoreGraph.eventType.updated}`, {
+    data: {
+      graphId, // Fragment ID
+      fragmentId: graphId, // Same as graphId
+      workspaceId,
+      dataSourceRef: validatedUpdatedData.dataSourceRef,
+      connectorRef: validatedUpdatedData.connectorRef,
+      occurredAt: new Date().toISOString(),
+      initiatedBy: typedPathway.getUserResolver ? (await typedPathway.getUserResolver()).entityId : "system",
+      requestId: randomUUID(),
+    },
+  })
 
   return { graphId, status: "processing" }
 }
@@ -380,7 +478,7 @@ export async function updateGraph(
  * Mutation function - requires SessionPathway
  */
 export async function deleteGraph(
-  sessionPathway: SessionPathwayBuilder<any>,
+  sessionPathway: GraphServiceSessionPathway,
   workspaceId: string,
   graphId: string, // Fragment ID
   accessToken: string
@@ -395,21 +493,17 @@ export async function deleteGraph(
   await usableApi.deleteFragment(workspaceId, graphId, accessToken)
 
   // Emit graph.deleted.0 event via Session Pathways
-  await (sessionPathway as any).write(
-    `${graphContract.FlowcoreGraph.flowType}/${graphContract.FlowcoreGraph.eventType.deleted}`,
-    {
-      data: {
-        graphId, // Fragment ID
-        fragmentId: graphId, // Same as graphId
-        workspaceId,
-        occurredAt: new Date().toISOString(),
-        initiatedBy: (sessionPathway as any).getUserResolver
-          ? (await (sessionPathway as any).getUserResolver()).entityId
-          : "system",
-        requestId: randomUUID(),
-      },
-    }
-  )
+  const typedPathway = sessionPathway as TypedSessionPathway
+  await typedPathway.write(`${graphContract.FlowcoreGraph.flowType}/${graphContract.FlowcoreGraph.eventType.deleted}`, {
+    data: {
+      graphId, // Fragment ID
+      fragmentId: graphId, // Same as graphId
+      workspaceId,
+      occurredAt: new Date().toISOString(),
+      initiatedBy: typedPathway.getUserResolver ? (await typedPathway.getUserResolver()).entityId : "system",
+      requestId: randomUUID(),
+    },
+  })
 
   return { graphId, status: "processing" }
 }

@@ -222,8 +222,3 @@ export function getSecretProvider(): SecretProvider {
   }
   return secretProviderInstance
 }
-
-
-
-
-

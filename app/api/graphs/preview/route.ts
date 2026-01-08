@@ -1,10 +1,11 @@
-import { authOptions } from "@/lib/auth"
-import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
-import * as graphExecutionService from "@/lib/services/graph-execution.service"
-import { getServerSession } from "next-auth"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
 import { z } from "zod"
+import { authOptions } from "@/lib/auth"
+import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
+import { createSessionPathwayForAPI } from "@/lib/pathways/session-provider"
+import * as graphExecutionService from "@/lib/services/graph-execution.service"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -78,11 +79,17 @@ const previewGraphSchema = z
  * POST /api/graphs/preview
  * Execute a query preview without creating a graph
  */
-export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) => {
+export const POST = requireWorkspace(async (req: NextRequest, { workspaceId, userId }) => {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.accessToken) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+
+    // Create session pathway for auditing (required for POST endpoints)
+    const sessionContext = await createSessionPathwayForAPI()
+    if (!sessionContext) {
+      return NextResponse.json({ error: "Failed to create session context" }, { status: 500 })
     }
 
     // Parse and validate request body
@@ -132,8 +139,12 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) =
         )
       }
       // Multiple queries - use executeMultipleQueriesPreview
+      if (!userId) {
+        return NextResponse.json({ error: "User ID is required" }, { status: 401 })
+      }
       result = await graphExecutionService.executeMultipleQueriesPreview(
         workspaceId,
+        userId,
         {
           queries: queries as Array<
             | {
@@ -159,12 +170,16 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) =
         },
         effectiveParameters,
         session.user.accessToken,
-        timeRange
+        timeRange,
+        sessionContext.pathway
       )
     } else if (query) {
       // Single query (legacy) - dataSourceRef is required
       if (!dataSourceRef) {
         return NextResponse.json({ error: "dataSourceRef is required for single query" }, { status: 400 })
+      }
+      if (!userId) {
+        return NextResponse.json({ error: "User ID is required" }, { status: 401 })
       }
       result = await graphExecutionService.executeQuery(
         workspaceId,
@@ -183,8 +198,10 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) =
           connectorRef,
         },
         effectiveParameters,
+        userId,
         session.user.accessToken,
-        timeRange
+        timeRange,
+        sessionContext.pathway
       )
     } else {
       return NextResponse.json({ error: "Either 'query' or 'queries' must be provided" }, { status: 400 })
@@ -197,7 +214,3 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) =
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 })
-
-
-
-

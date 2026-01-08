@@ -63,9 +63,3 @@ export const EventGraphDeletedSchema = z.object({
 export type EventGraphCreated = z.infer<typeof EventGraphCreatedSchema>
 export type EventGraphUpdated = z.infer<typeof EventGraphUpdatedSchema>
 export type EventGraphDeleted = z.infer<typeof EventGraphDeletedSchema>
-
-
-
-
-
-

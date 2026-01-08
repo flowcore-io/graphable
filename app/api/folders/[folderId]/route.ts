@@ -68,7 +68,7 @@ async function wouldCreateCircularReference(
  * Get a folder by ID
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ folderId: string }> }) {
-  return requireWorkspace(async (request: NextRequest, { workspaceId }) => {
+  return requireWorkspace(async (_request: NextRequest, { workspaceId }) => {
     try {
       const { folderId } = await params
 
@@ -203,7 +203,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ fo
  * Delete a folder
  */
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ folderId: string }> }) {
-  return requireWorkspace(async (request: NextRequest, { workspaceId }) => {
+  return requireWorkspace(async (_request: NextRequest, { workspaceId }) => {
     try {
       const { folderId } = await params
 

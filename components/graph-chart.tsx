@@ -306,7 +306,3 @@ export function GraphChart({
       )
   }
 }
-
-
-
-

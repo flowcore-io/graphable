@@ -1,6 +1,6 @@
 import { dataSourceSecrets, db } from "@/db"
 import type { SessionPathwayBuilder } from "@flowcore/pathways"
-import { randomUUID } from "crypto"
+import { randomUUID } from "node:crypto"
 import { and, eq } from "drizzle-orm"
 import { ulid } from "ulid"
 import { z } from "zod"

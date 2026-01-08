@@ -7,10 +7,10 @@
 
 import * as dotenv from "dotenv"
 import { getServerSession } from "next-auth"
-import { authOptions } from "./lib/auth"
-import { createSessionPathwayForAPI } from "./lib/pathways/session-provider"
-import * as dataSourceService from "./lib/services/data-source.service"
-import * as graphService from "./lib/services/graph.service"
+import { authOptions } from "../lib/auth"
+import { createSessionPathwayForAPI } from "../lib/pathways/session-provider"
+import * as dataSourceService from "../lib/services/data-source.service"
+import * as graphService from "../lib/services/graph.service"
 
 // Load environment variables
 dotenv.config()
@@ -31,11 +31,11 @@ async function createExampleGraphs() {
     // Find the data source
     console.log(`🔍 Looking for data source: ${DATA_SOURCE_NAME}`)
     const dataSources = await dataSourceService.listDataSources(WORKSPACE_ID, accessToken)
-    const dataSource = dataSources.find((ds) => ds.name === DATA_SOURCE_NAME)
+    const dataSource = dataSources.find((ds: { name: string }) => ds.name === DATA_SOURCE_NAME)
 
     if (!dataSource) {
       throw new Error(
-        `Data source '${DATA_SOURCE_NAME}' not found. Available: ${dataSources.map((d) => d.name).join(", ")}`
+        `Data source '${DATA_SOURCE_NAME}' not found. Available: ${dataSources.map((d: { name: string }) => d.name).join(", ")}`
       )
     }
 
@@ -124,7 +124,3 @@ createExampleGraphs().catch((error) => {
   console.error("Fatal error:", error)
   process.exit(1)
 })
-
-
-
-

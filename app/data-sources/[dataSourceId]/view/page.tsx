@@ -7,7 +7,7 @@ import { useWorkspace } from "@/lib/context/workspace-context"
 import Editor from "@monaco-editor/react"
 import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, PlayIcon, TableIcon } from "lucide-react"
 import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 
 interface QueryResult {
@@ -21,7 +21,6 @@ interface QueryResult {
 
 export default function DataSourceViewPage() {
   const { workspaceId } = useWorkspace()
-  const router = useRouter()
   const params = useParams()
   const dataSourceId = params.dataSourceId as string
   const [isLoading, setIsLoading] = useState(true)

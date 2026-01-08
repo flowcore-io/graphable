@@ -1,0 +1,179 @@
+name: PR Standards Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+
+env:
+  NODE_VERSION: ">=22.16.0"
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  validate-standards:
+    runs-on: blacksmith-4vcpu-ubuntu-2204
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      
+      - name: Determine validation base ref
+        id: base-ref
+        run: |
+          if [[ "${{ github.head_ref }}" == release-please--* ]]; then
+            # For release-please branches, validate since last release
+            git fetch --tags
+            LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            if [ -z "$LAST_TAG" ]; then
+              echo "base-ref=${{ github.base_ref }}" >> $GITHUB_OUTPUT
+            else
+              echo "base-ref=$LAST_TAG" >> $GITHUB_OUTPUT
+            fi
+          else
+            # For regular PRs, use the base branch
+            echo "base-ref=${{ github.base_ref }}" >> $GITHUB_OUTPUT
+          fi
+      
+      - uses: flowcore-io/usable-pr-validator@v1.6.0
+        with:
+          prompt-file: '.codex/pr-validation-prompt.md'
+          comment-title: 'Standards Validation'
+          base-ref: ${{ steps.base-ref.outputs.base-ref }}
+          workspace-id: '60c10ca2-4115-4c1a-b6d7-04ac39fd3938'
+          gemini-model: 'gemini-2.5-pro'
+        env:
+          GEMINI_SERVICE_ACCOUNT_KEY: ${{ secrets.GEMINI_SERVICE_ACCOUNT_KEY }}
+          USABLE_API_TOKEN: ${{ secrets.USABLE_API_TOKEN }}
+  security-standards:
+    runs-on: blacksmith-4vcpu-ubuntu-2204
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      
+      - name: Determine validation base ref
+        id: base-ref
+        run: |
+          if [[ "${{ github.head_ref }}" == release-please--* ]]; then
+            # For release-please branches, validate since last release
+            git fetch --tags
+            LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            if [ -z "$LAST_TAG" ]; then
+              echo "base-ref=${{ github.base_ref }}" >> $GITHUB_OUTPUT
+            else
+              echo "base-ref=$LAST_TAG" >> $GITHUB_OUTPUT
+            fi
+          else
+            # For regular PRs, use the base branch
+            echo "base-ref=${{ github.base_ref }}" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: flowcore-io/usable-pr-validator@v1.6.0
+        with:
+          prompt-file: '.codex/pr-security-validation-prompt.md'
+          comment-title: 'Security Validation'
+          base-ref: ${{ steps.base-ref.outputs.base-ref }}
+          workspace-id: '60c10ca2-4115-4c1a-b6d7-04ac39fd3938'
+        env:
+          GEMINI_SERVICE_ACCOUNT_KEY: ${{ secrets.GEMINI_SERVICE_ACCOUNT_KEY }}
+          USABLE_API_TOKEN: ${{ secrets.USABLE_API_TOKEN }}
+  
+  violation-exceptions-table:
+    runs-on: blacksmith-4vcpu-ubuntu-2204
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      
+      - name: Extract exceptions table
+        id: extract-table
+        run: |
+          # Extract the table from VIOLATION_EXCEPTIONS.md
+          if [ -f "VIOLATION_EXCEPTIONS.md" ]; then
+            # Get everything from "## Exception Registry" to the end of file
+            TABLE_CONTENT=$(sed -n '/^## Exception Registry$/,$p' VIOLATION_EXCEPTIONS.md)
+            
+            # Save to temporary file to preserve formatting
+            echo "$TABLE_CONTENT" > /tmp/exceptions_table.md
+            
+            # Set multiline output
+            echo "table_content<<EOF" >> $GITHUB_OUTPUT
+            cat /tmp/exceptions_table.md >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            
+            # Count active exceptions
+            EXCEPTION_COUNT=$(grep -c "^|" VIOLATION_EXCEPTIONS.md | tail -1 || echo "0")
+            # Subtract 2 for header and separator rows
+            EXCEPTION_COUNT=$((EXCEPTION_COUNT - 2))
+            [ $EXCEPTION_COUNT -lt 0 ] && EXCEPTION_COUNT=0
+            echo "exception_count=$EXCEPTION_COUNT" >> $GITHUB_OUTPUT
+          else
+            echo "table_content=No exceptions registry found." >> $GITHUB_OUTPUT
+            echo "exception_count=0" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Post or update exceptions table comment
+        uses: actions/github-script@v7
+        env:
+          EXCEPTION_COUNT: ${{ steps.extract-table.outputs.exception_count }}
+          TABLE_CONTENT: ${{ steps.extract-table.outputs.table_content }}
+        with:
+          script: |
+            const commentIdentifier = '<!-- violation-exceptions-table -->';
+            const exceptionCount = process.env.EXCEPTION_COUNT;
+            const tableContent = process.env.TABLE_CONTENT;
+            
+            const commentBody = commentIdentifier + '\n' +
+              '# 📋 Approved Violation Exceptions\n\n' +
+              'This PR can reference the following approved violation exceptions. Any violations matching these exceptions will be automatically waived during validation.\n\n' +
+              '**Total Active Exceptions:** ' + exceptionCount + '\n\n' +
+              tableContent + '\n\n' +
+              '---\n\n' +
+              '💡 **How Exception Validation Works:**\n' +
+              '1. Validator checks if your code violation matches an exception in the table\n' +
+              '2. Verifies the commit SHA exists in this PR\n' +
+              '3. Fetches the detailed exception documentation from Usable\n' +
+              '4. Validates the exception has proper approval and justification\n' +
+              '5. If all checks pass, the violation is waived\n\n' +
+              '📝 **To add a new exception:** Follow the guidelines in `VIOLATION_EXCEPTIONS.md`\n\n' +
+              '🔄 *This comment is automatically updated when VIOLATION_EXCEPTIONS.md changes*';
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const existingComment = comments.find(comment => 
+              comment.body && comment.body.includes(commentIdentifier)
+            );
+            
+            if (existingComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: commentBody
+              });
+              console.log('Updated existing exceptions table comment');
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody
+              });
+              console.log('Posted new exceptions table comment');
+            }

@@ -76,11 +76,3 @@ export async function createSessionPathwayForAPI(): Promise<SessionPathwayContex
     return null
   }
 }
-
-
-
-
-
-
-
-

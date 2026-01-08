@@ -70,9 +70,3 @@ export function ChatInterface() {
     </Card>
   )
 }
-
-
-
-
-
-

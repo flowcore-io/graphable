@@ -19,11 +19,3 @@ export function Providers({
     </SessionProvider>
   )
 }
-
-
-
-
-
-
-
-

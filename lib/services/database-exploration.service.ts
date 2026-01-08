@@ -3,10 +3,13 @@
  * Provides functionality to list tables, describe table schemas, and sample rows
  */
 
-import { dataSourceSecrets, db } from "@/db"
 import { and, eq } from "drizzle-orm"
+import { dataSourceSecrets, db } from "@/db"
+import { logger } from "./logger.service"
 import type { SecretReference } from "./secret-provider.service"
 import { getSecretProvider } from "./secret-provider.service"
+import { validateSqlQuery } from "./sql-validation.service"
+import { getTenantLinkByWorkspace } from "./tenant.service"
 
 /**
  * Table information
@@ -112,10 +115,17 @@ async function getConnectionConfig(
  * List tables in a data source (admin-only)
  * Connects to PostgreSQL and queries pg_tables
  */
-export async function listTables(dataSourceId: string, workspaceId: string, accessToken: string): Promise<TableInfo[]> {
+export async function listTables(
+  dataSourceId: string,
+  workspaceId: string,
+  userId: string,
+  accessToken: string
+): Promise<TableInfo[]> {
   // Check workspace admin role before allowing exploration
-  // TODO: Implement proper admin role checking via Usable API
-  // For now, we'll allow it but this should be enforced
+  const isAdmin = await isWorkspaceAdmin(workspaceId, userId, accessToken)
+  if (!isAdmin) {
+    throw new Error("Forbidden: Database exploration requires workspace admin access")
+  }
 
   const connectionConfig = await getConnectionConfig(dataSourceId, workspaceId)
 
@@ -169,10 +179,14 @@ export async function describeTable(
   workspaceId: string,
   tableName: string,
   schemaName: string | undefined,
+  userId: string,
   accessToken: string
 ): Promise<TableSchema> {
   // Check workspace admin role before allowing exploration
-  // TODO: Implement proper admin role checking via Usable API
+  const isAdmin = await isWorkspaceAdmin(workspaceId, userId, accessToken)
+  if (!isAdmin) {
+    throw new Error("Forbidden: Database exploration requires workspace admin access")
+  }
 
   const connectionConfig = await getConnectionConfig(dataSourceId, workspaceId)
 
@@ -245,11 +259,15 @@ export async function sampleRows(
   workspaceId: string,
   tableName: string,
   schemaName: string | undefined,
-  limit: number = 10,
+  limit: number,
+  userId: string,
   accessToken: string
 ): Promise<unknown[]> {
   // Check workspace admin role before allowing exploration
-  // TODO: Implement proper admin role checking via Usable API
+  const isAdmin = await isWorkspaceAdmin(workspaceId, userId, accessToken)
+  if (!isAdmin) {
+    throw new Error("Forbidden: Database exploration requires workspace admin access")
+  }
 
   // Validate limit parameter (max 100 rows per PRD)
   const validatedLimit = Math.min(Math.max(limit, 1), 100)
@@ -292,17 +310,71 @@ export async function sampleRows(
 }
 
 /**
+ * Extract column names from PostgreSQL result with fallback validation
+ * When queries are wrapped in subqueries, result.fields may contain duplicate/incorrect names
+ * This function validates and falls back to extracting from row keys if needed
+ */
+function extractColumnNames(result: { fields?: Array<{ name: string }>; rows: unknown[] }): string[] {
+  // First, try to extract from result.fields
+  const fieldsColumns = result.fields ? result.fields.map((field) => field.name) : []
+
+  // If no fields, return empty array
+  if (fieldsColumns.length === 0) {
+    return []
+  }
+
+  // Validate: check if all column names are unique
+  const uniqueColumns = new Set(fieldsColumns)
+  const hasDuplicates = uniqueColumns.size !== fieldsColumns.length
+
+  // If we have rows, validate that column names match row keys
+  let columnsMatchRowKeys = true
+  if (result.rows.length > 0) {
+    const firstRow = result.rows[0]
+    if (firstRow && typeof firstRow === "object" && firstRow !== null) {
+      const rowKeys = Object.keys(firstRow)
+      // Check if all field columns exist in row keys and vice versa
+      const fieldSet = new Set(fieldsColumns)
+      const rowKeySet = new Set(rowKeys)
+      columnsMatchRowKeys =
+        fieldsColumns.length === rowKeys.length &&
+        fieldsColumns.every((col) => rowKeySet.has(col)) &&
+        rowKeys.every((key) => fieldSet.has(key))
+    }
+  }
+
+  // If validation passes (no duplicates and columns match row keys), use fields
+  if (!hasDuplicates && columnsMatchRowKeys) {
+    return fieldsColumns
+  }
+
+  // Validation failed - fall back to extracting from first row's keys
+  if (result.rows.length > 0) {
+    const firstRow = result.rows[0]
+    if (firstRow && typeof firstRow === "object" && firstRow !== null) {
+      return Object.keys(firstRow)
+    }
+  }
+
+  // Fallback: return fields columns even if invalid (better than empty)
+  return fieldsColumns
+}
+
+/**
  * Execute a SQL query with pagination
  * Returns paginated results with total count
+ * @param requireAdmin - If true, requires workspace admin access. If false, only requires workspace access (for graph execution)
  */
 export async function executeQuery(
   dataSourceId: string,
   workspaceId: string,
   query: string,
-  page: number = 1,
-  pageSize: number = 50,
+  page: number,
+  pageSize: number,
+  userId: string,
   accessToken: string,
-  preBoundParameters?: unknown[]
+  preBoundParameters?: unknown[],
+  requireAdmin: boolean = true
 ): Promise<{
   rows: unknown[]
   columns: string[]
@@ -311,6 +383,21 @@ export async function executeQuery(
   pageSize: number
   totalPages: number
 }> {
+  // Check workspace admin role before allowing exploration (only if requireAdmin is true)
+  // Graph execution bypasses admin check - authorization is handled at API route level
+  if (requireAdmin) {
+    const isAdmin = await isWorkspaceAdmin(workspaceId, userId, accessToken)
+    if (!isAdmin) {
+      throw new Error("Forbidden: Database exploration requires workspace admin access")
+    }
+  }
+
+  // Defensive SQL validation (prevents SQL injection even if called directly)
+  const validation = validateSqlQuery(query)
+  if (!validation.valid) {
+    throw new Error(`Invalid SQL query: ${validation.error}`)
+  }
+
   // Validate page and pageSize
   const validatedPage = Math.max(1, page)
   const validatedPageSize = Math.min(Math.max(pageSize, 1), 1000) // Max 1000 rows per page
@@ -407,8 +494,8 @@ export async function executeQuery(
       canCount = true
     }
 
-    // Extract column names from result (only for SELECT queries)
-    const columns = result.fields ? result.fields.map((field: { name: string }) => field.name) : []
+    // Extract column names from result with fallback validation (only for SELECT queries)
+    const columns = isSelectQuery ? extractColumnNames(result) : []
 
     // If we couldn't get count for SELECT queries, estimate it (not accurate but better than nothing)
     if (!canCount && isSelectQuery) {
@@ -435,13 +522,24 @@ export async function executeQuery(
 
 /**
  * Check if user is workspace admin
- * TODO: Implement actual admin role check via Usable API
- * For now, returns false (no admin access by default)
- * This should be implemented when Usable API supports workspace role checking
+ * Currently checks if user is the workspace owner (user who linked the workspace)
+ * TODO: When Usable API provides workspace role endpoints, update this to check actual roles
  */
-export async function isWorkspaceAdmin(workspaceId: string, userId: string, accessToken: string): Promise<boolean> {
-  // TODO: Check user role in workspace via Usable API
-  // For MVP, return false (no admin access by default)
-  // This will need to be implemented when Usable API provides workspace role endpoints
-  return false
+export async function isWorkspaceAdmin(workspaceId: string, userId: string, _accessToken: string): Promise<boolean> {
+  try {
+    // Get tenant link for workspace to find the owner
+    const tenantLink = await getTenantLinkByWorkspace(workspaceId)
+
+    // User is admin if they are the workspace owner (linked the workspace)
+    return tenantLink?.usableUserId === userId
+  } catch (error) {
+    logger.error("Error checking workspace admin status", {
+      workspaceId,
+      userId,
+      error: error instanceof Error ? error.message : "Unknown error",
+      errorType: error instanceof Error ? error.constructor.name : typeof error,
+    })
+    // Fail closed - return false on error
+    return false
+  }
 }

@@ -58,11 +58,3 @@ export async function handlerTenantUnlinked(event: FlowcoreEvent<EventTenantUnli
 
   console.log(`✅ Tenant link deleted: workspace ${workspaceId} unlinked from user ${usableUserId}`)
 }
-
-
-
-
-
-
-
-

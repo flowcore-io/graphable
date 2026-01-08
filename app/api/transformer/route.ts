@@ -28,11 +28,3 @@ export async function POST(request: NextRequest) {
     return new NextResponse((error as Error).message || "Internal server error", { status: 500 })
   }
 }
-
-
-
-
-
-
-
-

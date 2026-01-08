@@ -1,6 +1,6 @@
+import { type NextRequest, NextResponse } from "next/server"
 import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
 import * as databaseExplorationService from "@/lib/services/database-exploration.service"
-import { type NextRequest, NextResponse } from "next/server"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -9,19 +9,29 @@ export const runtime = "nodejs"
  * GET /api/data-sources/[dataSourceId]/explore?action=listTables
  * GET /api/data-sources/[dataSourceId]/explore?action=describeTable&tableName=...
  * GET /api/data-sources/[dataSourceId]/explore?action=sampleRows&tableName=...&limit=10
- * Endpoint for database exploration (requires workspace access)
+ * Endpoint for database exploration (requires workspace admin access)
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ dataSourceId: string }> }) {
-  return requireWorkspace(async (request: NextRequest, { workspaceId, accessToken }) => {
+  return requireWorkspace(async (request: NextRequest, { workspaceId, userId, accessToken }) => {
     try {
       const { dataSourceId } = await params
+
+      // Check workspace admin access (defense-in-depth - also checked in service layer)
+      const isAdmin = await databaseExplorationService.isWorkspaceAdmin(workspaceId, userId, accessToken)
+      if (!isAdmin) {
+        console.warn(`Unauthorized database exploration attempt by user ${userId} for workspace ${workspaceId}`)
+        return NextResponse.json(
+          { error: "Forbidden: Database exploration requires workspace admin access" },
+          { status: 403 }
+        )
+      }
 
       // Get action from query parameters
       const url = new URL(request.url)
       const action = url.searchParams.get("action")
 
       if (action === "listTables") {
-        const tables = await databaseExplorationService.listTables(dataSourceId, workspaceId, accessToken)
+        const tables = await databaseExplorationService.listTables(dataSourceId, workspaceId, userId, accessToken)
         return NextResponse.json({ tables })
       }
 
@@ -38,6 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
           workspaceId,
           tableName,
           schemaName,
+          userId,
           accessToken
         )
         return NextResponse.json({ schema })
@@ -65,6 +76,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
           tableName,
           schemaName,
           limit,
+          userId,
           accessToken
         )
         return NextResponse.json({ rows })
@@ -77,12 +89,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
     } catch (error) {
       console.error("Error exploring database:", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to explore database"
+
+      // Handle authorization errors with proper status code
+      if (errorMessage.includes("Forbidden")) {
+        return NextResponse.json({ error: errorMessage }, { status: 403 })
+      }
+
       return NextResponse.json({ error: errorMessage }, { status: 500 })
     }
   })(req)
 }
-
-
-
-
-

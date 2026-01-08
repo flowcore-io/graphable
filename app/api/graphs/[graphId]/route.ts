@@ -68,7 +68,7 @@ const updateGraphSchema = z.object({
  * Get a graph by ID
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ graphId: string }> }) {
-  return requireWorkspace(async (request: NextRequest, { workspaceId }) => {
+  return requireWorkspace(async (_request: NextRequest, { workspaceId }) => {
     try {
       const { graphId } = await params
 
@@ -160,7 +160,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ grap
  * Delete a graph
  */
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ graphId: string }> }) {
-  return requireWorkspace(async (request: NextRequest, { workspaceId }) => {
+  return requireWorkspace(async (_request: NextRequest, { workspaceId }) => {
     try {
       const { graphId } = await params
 

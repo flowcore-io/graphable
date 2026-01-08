@@ -1,9 +1,10 @@
-import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
-import { createSessionPathwayForAPI } from "@/lib/pathways/session-provider"
-import * as dataSourceService from "@/lib/services/data-source.service"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
+import { createSessionPathwayForAPI } from "@/lib/pathways/session-provider"
+import * as dataSourceService from "@/lib/services/data-source.service"
+import { logger } from "@/lib/services/logger.service"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
 
       return NextResponse.json({ dataSource })
     } catch (error) {
-      console.error("Error getting data source:", error)
+      logger.errorWithException("Error getting data source", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to get data source"
       return NextResponse.json({ error: errorMessage }, { status: 500 })
     }
@@ -95,7 +96,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ da
 
       return NextResponse.json(result)
     } catch (error) {
-      console.error("Error updating data source:", error)
+      logger.errorWithException("Error updating data source", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to update data source"
       return NextResponse.json({ error: errorMessage }, { status: 500 })
     }
@@ -127,7 +128,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ d
 
       return NextResponse.json(result)
     } catch (error) {
-      console.error("Error deleting data source:", error)
+      logger.errorWithException("Error deleting data source", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to delete data source"
       return NextResponse.json({ error: errorMessage }, { status: 500 })
     }

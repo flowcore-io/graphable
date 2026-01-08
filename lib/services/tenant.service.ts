@@ -1,8 +1,9 @@
+import type { SessionPathwayBuilder } from "@flowcore/pathways"
+import { eq } from "drizzle-orm"
 import { db } from "@/db"
 import type { TenantLink } from "@/db/schema"
 import { tenantLinks } from "@/db/schema"
-import type { SessionPathwayBuilder } from "@flowcore/pathways"
-import { eq } from "drizzle-orm"
+import { logger } from "./logger.service"
 import { usableApi } from "./usable-api.service"
 
 /**
@@ -95,7 +96,7 @@ export async function validateWorkspaceAccess(
     // Additional role checking can be added here if needed
     return !!workspace
   } catch (error) {
-    console.error("Workspace access validation failed:", error)
+    logger.errorWithException("Workspace access validation failed", error)
     return false
   }
 }

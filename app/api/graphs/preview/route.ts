@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth"
 import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
 import { createSessionPathwayForAPI } from "@/lib/pathways/session-provider"
 import * as graphExecutionService from "@/lib/services/graph-execution.service"
+import { logger } from "@/lib/services/logger.service"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -97,8 +98,10 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId, use
     const validationResult = previewGraphSchema.safeParse(body)
 
     if (!validationResult.success) {
-      console.error("Preview validation failed:", JSON.stringify(validationResult.error.issues, null, 2))
-      console.error("Request body:", JSON.stringify(body, null, 2))
+      logger.error("Preview validation failed", {
+        validationErrors: validationResult.error.issues,
+        requestBody: body,
+      })
       return NextResponse.json(
         {
           error: "Invalid preview data",
@@ -209,7 +212,7 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId, use
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error("Error executing preview:", error)
+    logger.errorWithException("Error executing preview", error)
     const errorMessage = error instanceof Error ? error.message : "Failed to execute preview"
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }

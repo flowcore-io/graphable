@@ -13,6 +13,15 @@ export interface LogContext {
 }
 
 /**
+ * Error context with standard error fields
+ */
+export interface ErrorContext extends LogContext {
+  error?: string
+  stack?: string
+  [key: string]: unknown
+}
+
+/**
  * Structured logger service for server-side logging
  *
  * Provides environment-aware logging:
@@ -29,6 +38,53 @@ class LoggerService {
   constructor() {
     this.isDevelopment = env.NODE_ENV === "development"
     this.isProduction = env.NODE_ENV === "production"
+  }
+
+  /**
+   * Helper to format an Error object into a standard error context
+   * This extracts the error message and stack trace safely
+   */
+  private formatError(error: unknown): ErrorContext {
+    if (error instanceof Error) {
+      return {
+        error: error.message,
+        stack: error.stack,
+      }
+    }
+    return {
+      error: String(error),
+    }
+  }
+
+  /**
+   * Log an error with automatic Error object formatting
+   * @param message - Human-readable error message
+   * @param errorOrContext - Either an Error object, or a context object with additional fields
+   */
+  errorWithException(message: string, errorOrContext: unknown | LogContext): void {
+    // If it's an Error object, format it
+    if (errorOrContext instanceof Error) {
+      this.log("error", message, this.formatError(errorOrContext))
+      return
+    }
+
+    // If it's a context object that contains an error field
+    if (errorOrContext && typeof errorOrContext === "object" && "error" in errorOrContext) {
+      const ctx = errorOrContext as LogContext
+      const error = ctx.error
+
+      // If the error field is an Error object, format it
+      if (error instanceof Error) {
+        this.log("error", message, {
+          ...ctx,
+          ...this.formatError(error),
+        })
+        return
+      }
+    }
+
+    // Otherwise, treat as regular context
+    this.log("error", message, errorOrContext as LogContext)
   }
 
   /**

@@ -1,8 +1,9 @@
+import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { createSessionPathwayForAPI } from "@/lib/pathways/session-provider"
+import { logger } from "@/lib/services/logger.service"
 import { deleteTenantLink, getTenantLink } from "@/lib/services/tenant.service"
-import { getServerSession } from "next-auth"
-import { NextResponse } from "next/server"
 
 /**
  * POST /api/onboarding/unlink-workspace
@@ -42,7 +43,7 @@ export async function POST() {
       message: "Workspace unlinked successfully",
     })
   } catch (error) {
-    console.error("Error unlinking workspace:", error)
+    logger.errorWithException("Error unlinking workspace", error)
     const errorMessage = error instanceof Error ? error.message : "Failed to unlink workspace"
 
     if (errorMessage.includes("No tenant link")) {

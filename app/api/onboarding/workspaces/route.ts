@@ -1,7 +1,8 @@
-import { authOptions } from "@/lib/auth"
-import { usableApi } from "@/lib/services/usable-api.service"
-import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { logger } from "@/lib/services/logger.service"
+import { usableApi } from "@/lib/services/usable-api.service"
 
 /**
  * GET /api/onboarding/workspaces
@@ -30,7 +31,7 @@ export async function GET() {
       workspaces,
     })
   } catch (error) {
-    console.error("Error fetching workspaces:", error)
+    logger.errorWithException("Error fetching workspaces", error)
     return NextResponse.json({ error: "Failed to fetch workspaces" }, { status: 500 })
   }
 }

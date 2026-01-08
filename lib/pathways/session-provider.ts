@@ -1,7 +1,8 @@
-import { authOptions } from "@/lib/auth"
 import { AUDIT_USER_ENTITY_TYPE, SessionPathwayBuilder } from "@flowcore/pathways"
-import { getServerSession } from "next-auth"
 import type { NextRequest } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { logger } from "@/lib/services/logger.service"
 import { pathways } from "./pathways"
 
 export interface SessionPathwayContext {
@@ -72,7 +73,7 @@ export async function createSessionPathwayForAPI(): Promise<SessionPathwayContex
       userType: entityType,
     }
   } catch (error) {
-    console.error("Failed to create session pathway:", error)
+    logger.errorWithException("Failed to create session pathway", error)
     return null
   }
 }

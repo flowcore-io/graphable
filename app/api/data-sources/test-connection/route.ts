@@ -1,6 +1,7 @@
-import { testConnectionString } from "@/lib/services/data-source.service"
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { testConnectionString } from "@/lib/services/data-source.service"
+import { logger } from "@/lib/services/logger.service"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error("Failed to test connection:", error)
+    logger.errorWithException("Failed to test connection", error)
     return NextResponse.json(
       {
         success: false,

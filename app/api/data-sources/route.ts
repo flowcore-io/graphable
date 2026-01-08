@@ -1,9 +1,10 @@
-import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
-import { createSessionPathwayForAPI } from "@/lib/pathways/session-provider"
-import * as dataSourceService from "@/lib/services/data-source.service"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
+import { createSessionPathwayForAPI } from "@/lib/pathways/session-provider"
+import * as dataSourceService from "@/lib/services/data-source.service"
+import { logger } from "@/lib/services/logger.service"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -40,7 +41,7 @@ export const GET = requireWorkspace(async (_req: NextRequest, { workspaceId, acc
 
     return NextResponse.json({ dataSources })
   } catch (error) {
-    console.error("Error listing data sources:", error)
+    logger.errorWithException("Error listing data sources", error)
     return NextResponse.json({ error: "Failed to list data sources" }, { status: 500 })
   }
 })
@@ -81,7 +82,7 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId, acc
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error("Error creating data source:", error)
+    logger.errorWithException("Error creating data source", error)
     const errorMessage = error instanceof Error ? error.message : "Failed to create data source"
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }

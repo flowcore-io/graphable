@@ -22,6 +22,7 @@ import type { SessionPathwayBuilder } from "@flowcore/pathways"
 import { ulid } from "ulid"
 import { z } from "zod"
 import * as graphContract from "../pathways/contracts/graph.0"
+import { logger } from "./logger.service"
 import { validateSqlQuery } from "./sql-validation.service"
 import { usableApi } from "./usable-api.service"
 
@@ -331,7 +332,7 @@ export async function createGraph(
   try {
     validatedContent = graphFragmentDataSchema.parse(fragmentContent)
   } catch (error) {
-    console.error("Graph fragment content validation failed:", {
+    logger.error("Graph fragment content validation failed", {
       error,
       fragmentContent,
       fragmentContentKeys: Object.keys(fragmentContent),
@@ -356,7 +357,7 @@ export async function createGraph(
     repository: "graphable",
   }
 
-  console.log("Creating graph fragment:", {
+  logger.info("Creating graph fragment", {
     workspaceId,
     fragmentTypeId,
     title: fragmentInput.title,
@@ -416,7 +417,7 @@ export async function updateGraph(
     const parsed = JSON.parse(fragment.content || "{}")
     existingData = graphFragmentDataSchema.parse(parsed)
   } catch (error) {
-    console.error("Failed to parse existing graph fragment content:", error)
+    logger.errorWithException("Failed to parse existing graph fragment content", error)
     throw new Error(`Invalid graph fragment content: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 
@@ -536,7 +537,7 @@ export async function getGraph(
     const jsonParsed = JSON.parse(fragment.content || "{}")
     parsed = graphFragmentDataSchema.parse(jsonParsed)
   } catch (error) {
-    console.error("Failed to parse graph fragment content:", error)
+    logger.errorWithException("Failed to parse graph fragment content", error)
     throw new Error(`Invalid graph fragment content: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 
@@ -570,7 +571,7 @@ export async function listGraphs(workspaceId: string, accessToken: string): Prom
 
   // If fragment type doesn't exist, return empty array (workspace not bootstrapped)
   if (!fragmentTypeId) {
-    console.warn("Fragment type 'graphs' not found. Workspace may not be bootstrapped.")
+    logger.warn("Fragment type 'graphs' not found. Workspace may not be bootstrapped.")
     return []
   }
 
@@ -590,7 +591,7 @@ export async function listGraphs(workspaceId: string, accessToken: string): Prom
   const validFragments = fragments.filter((fragment) => fragment.fragmentTypeId === fragmentTypeId)
 
   if (validFragments.length !== fragments.length) {
-    console.warn(
+    logger.warn(
       `Filtered out ${fragments.length - validFragments.length} fragments with incorrect fragment type. Expected: ${fragmentTypeId}`
     )
   }
@@ -611,7 +612,7 @@ export async function listGraphs(workspaceId: string, accessToken: string): Prom
       parameterCount = content.parameterSchema.parameters.length || 0
     } catch (error) {
       // If parsing/validation fails, use defaults and log warning
-      console.warn(`Failed to parse graph fragment ${fragment.id}:`, error)
+      logger.errorWithException(`Failed to parse graph fragment ${fragment.id}`, error)
     }
 
     return {

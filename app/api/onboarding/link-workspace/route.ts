@@ -1,10 +1,11 @@
+import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { z } from "zod"
 import { authOptions } from "@/lib/auth"
 import { createSessionPathwayForAPI } from "@/lib/pathways/session-provider"
+import { logger } from "@/lib/services/logger.service"
 import { createTenantLink, getTenantLinkByWorkspace, validateWorkspaceAccess } from "@/lib/services/tenant.service"
 import { bootstrapWorkspace } from "@/lib/services/workspace-bootstrap.service"
-import { getServerSession } from "next-auth"
-import { NextResponse } from "next/server"
-import { z } from "zod"
 
 /**
  * Schema for validating workspace link request
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
     try {
       await bootstrapWorkspace(workspaceId, session.user.accessToken)
     } catch (bootstrapError) {
-      console.error("Bootstrap failed (non-blocking):", bootstrapError)
+      logger.errorWithException("Bootstrap failed (non-blocking)", bootstrapError)
       // Don't fail the link operation if bootstrap fails
       // Bootstrap can be retried later
     }
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
       message: "Workspace linked successfully",
     })
   } catch (error) {
-    console.error("Error linking workspace:", error)
+    logger.errorWithException("Error linking workspace", error)
     const errorMessage = error instanceof Error ? error.message : "Failed to link workspace"
 
     // Handle specific error cases

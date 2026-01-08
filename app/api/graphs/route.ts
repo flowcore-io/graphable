@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth"
 import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
 import { createSessionPathwayForAPI } from "@/lib/pathways/session-provider"
 import * as graphService from "@/lib/services/graph.service"
+import { logger } from "@/lib/services/logger.service"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -111,7 +112,7 @@ export const GET = requireWorkspace(async (_req: NextRequest, { workspaceId }) =
 
     return NextResponse.json({ graphs })
   } catch (error) {
-    console.error("Error listing graphs:", error)
+    logger.errorWithException("Error listing graphs", error)
     return NextResponse.json({ error: "Failed to list graphs" }, { status: 500 })
   }
 })
@@ -159,7 +160,7 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) =
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error("Error creating graph:", error)
+    logger.errorWithException("Error creating graph", error)
     const errorMessage = error instanceof Error ? error.message : "Failed to create graph"
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }

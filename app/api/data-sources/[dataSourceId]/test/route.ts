@@ -1,7 +1,8 @@
-import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
-import * as dataSourceService from "@/lib/services/data-source.service"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
+import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
+import * as dataSourceService from "@/lib/services/data-source.service"
+import { logger } from "@/lib/services/logger.service"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
 
       return NextResponse.json({ success: true, message: "Connection test successful" })
     } catch (error) {
-      console.error("Error testing data source connection:", error)
+      logger.errorWithException("Error testing data source connection", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to test connection"
       return NextResponse.json({ error: errorMessage }, { status: 500 })
     }

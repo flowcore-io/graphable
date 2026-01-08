@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
 import * as databaseExplorationService from "@/lib/services/database-exploration.service"
+import { logger } from "@/lib/services/logger.service"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -19,7 +20,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
       // Check workspace admin access (defense-in-depth - also checked in service layer)
       const isAdmin = await databaseExplorationService.isWorkspaceAdmin(workspaceId, userId, accessToken)
       if (!isAdmin) {
-        console.warn(`Unauthorized database exploration attempt by user ${userId} for workspace ${workspaceId}`)
+        logger.warn("Unauthorized database exploration attempt", {
+          userId,
+          workspaceId,
+        })
         return NextResponse.json(
           { error: "Forbidden: Database exploration requires workspace admin access" },
           { status: 403 }
@@ -87,7 +91,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
         { status: 400 }
       )
     } catch (error) {
-      console.error("Error exploring database:", error)
+      logger.errorWithException("Error exploring database", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to explore database"
 
       // Handle authorization errors with proper status code

@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth"
 import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
 import { createSessionPathwayForAPI } from "@/lib/pathways/session-provider"
 import * as graphExecutionService from "@/lib/services/graph-execution.service"
+import { logger } from "@/lib/services/logger.service"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gra
 
       return NextResponse.json(result)
     } catch (error) {
-      console.error("Error executing graph:", error)
+      logger.errorWithException("Error executing graph", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to execute graph"
 
       // Return validation errors with 400 status

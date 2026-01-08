@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
 import * as databaseExplorationService from "@/lib/services/database-exploration.service"
+import { logger } from "@/lib/services/logger.service"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -25,7 +26,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
       // Check workspace admin access (defense-in-depth - also checked in service layer)
       const isAdmin = await databaseExplorationService.isWorkspaceAdmin(workspaceId, userId, accessToken)
       if (!isAdmin) {
-        console.warn(`Unauthorized query execution attempt by user ${userId} for workspace ${workspaceId}`)
+        logger.warn("Unauthorized query execution attempt", {
+          userId,
+          workspaceId,
+        })
         return NextResponse.json(
           { error: "Forbidden: Database exploration requires workspace admin access" },
           { status: 403 }
@@ -61,7 +65,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
 
       return NextResponse.json(result)
     } catch (error) {
-      console.error("Error executing query:", error)
+      logger.errorWithException("Error executing query", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to execute query"
 
       // Handle authorization errors with proper status code

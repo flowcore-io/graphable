@@ -82,11 +82,20 @@ export class UsableApiService {
       const errorData = await response.json().catch(() => ({}))
       const errorMessage =
         errorData.error || errorData.message || `Usable API error: ${response.status} ${response.statusText}`
+
+      // Sanitize error data to prevent sensitive information exposure
+      // Only log safe error fields: error, message, statusCode, code
+      const sanitizedError = {
+        error: errorData.error,
+        message: errorData.message,
+        statusCode: errorData.statusCode,
+        code: errorData.code,
+      }
+
       logger.error("Usable API error", {
         status: response.status,
         statusText: response.statusText,
-        error: errorData,
-        errorDetails: errorData.details ? JSON.stringify(errorData.details, null, 2) : undefined,
+        error: sanitizedError,
         endpoint,
         method: fetchOptions.method || "GET",
       })

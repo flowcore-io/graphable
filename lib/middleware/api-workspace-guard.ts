@@ -1,9 +1,10 @@
-import { authOptions } from "@/lib/auth"
-import { getWorkspaceForUser, validateWorkspaceAccess } from "@/lib/services/tenant.service"
-import { getServerSession } from "next-auth"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
 import { z } from "zod"
+import { authOptions } from "@/lib/auth"
+import { logger } from "@/lib/services/logger.service"
+import { getWorkspaceForUser, validateWorkspaceAccess } from "@/lib/services/tenant.service"
 
 /**
  * Schema for validating workspace ID
@@ -45,10 +46,10 @@ export function requireWorkspace(
   handler: (
     req: NextRequest,
     context: { workspaceId: string; userId: string; accessToken: string }
-  ) => Promise<NextResponse<any>>,
+  ) => Promise<NextResponse<unknown>>,
   options: RequireWorkspaceOptions = {}
 ) {
-  return async (req: NextRequest): Promise<NextResponse<any>> => {
+  return async (req: NextRequest): Promise<NextResponse<unknown>> => {
     try {
       // Layer 1 - Authentication (401)
       const session = await getServerSession(authOptions)
@@ -115,7 +116,10 @@ export function requireWorkspace(
         accessToken,
       })
     } catch (error) {
-      console.error("Workspace guard error:", error)
+      logger.error("Workspace guard error", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      })
       return NextResponse.json({ error: "Internal server error" }, { status: 500 })
     }
   }

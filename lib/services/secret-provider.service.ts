@@ -6,6 +6,7 @@
 
 import { DefaultAzureCredential } from "@azure/identity"
 import { SecretClient } from "@azure/keyvault-secrets"
+import { logger } from "./logger.service"
 import { getSecretCache } from "./secret-cache.service"
 
 /**
@@ -108,7 +109,11 @@ export class AzureKeyVaultSecretProvider implements SecretProvider {
 
       return secretRef
     } catch (error) {
-      console.error(`Failed to store secret ${secretName}:`, error)
+      logger.error("Failed to store secret in Azure Key Vault", {
+        secretName,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      })
       throw new Error(`Failed to store secret: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
@@ -144,7 +149,12 @@ export class AzureKeyVaultSecretProvider implements SecretProvider {
 
       return secret.value
     } catch (error) {
-      console.error(`Failed to retrieve secret ${secretRef.secretName}:`, error)
+      logger.error("Failed to retrieve secret from Azure Key Vault", {
+        secretName: secretRef.secretName,
+        version: secretRef.version,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      })
       throw new Error(`Failed to retrieve secret: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
@@ -178,7 +188,12 @@ export class AzureKeyVaultSecretProvider implements SecretProvider {
 
       return newSecretRef
     } catch (error) {
-      console.error(`Failed to rotate secret ${secretRef.secretName}:`, error)
+      logger.error("Failed to rotate secret in Azure Key Vault", {
+        secretName: secretRef.secretName,
+        version: secretRef.version,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      })
       throw new Error(`Failed to rotate secret: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
@@ -201,7 +216,12 @@ export class AzureKeyVaultSecretProvider implements SecretProvider {
       const cache = getSecretCache()
       cache.delete(secretRef)
     } catch (error) {
-      console.error(`Failed to delete secret ${secretRef.secretName}:`, error)
+      logger.error("Failed to delete secret from Azure Key Vault", {
+        secretName: secretRef.secretName,
+        version: secretRef.version,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      })
       throw new Error(`Failed to delete secret: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }

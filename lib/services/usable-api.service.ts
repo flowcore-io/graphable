@@ -1,4 +1,5 @@
 import { env } from "@/lib/env"
+import { logger } from "./logger.service"
 
 export interface UsableWorkspace {
   id: string
@@ -81,7 +82,7 @@ export class UsableApiService {
       const errorData = await response.json().catch(() => ({}))
       const errorMessage =
         errorData.error || errorData.message || `Usable API error: ${response.status} ${response.statusText}`
-      console.error("Usable API error:", {
+      logger.error("Usable API error", {
         status: response.status,
         statusText: response.statusText,
         error: errorData,
@@ -242,7 +243,9 @@ export class UsableApiService {
     }
 
     // If we get here, the response format is unexpected
-    console.error("Unexpected createFragment response format:", JSON.stringify(response, null, 2))
+    logger.error("Unexpected createFragment response format", {
+      response: JSON.stringify(response, null, 2),
+    })
     throw new Error(`Unexpected response format from createFragment API: ${JSON.stringify(response)}`)
   }
 
@@ -273,7 +276,9 @@ export class UsableApiService {
     }
 
     // If we get here, the response format is unexpected
-    console.error("Unexpected getFragment response format:", JSON.stringify(response, null, 2))
+    logger.error("Unexpected getFragment response format", {
+      response: JSON.stringify(response, null, 2),
+    })
     throw new Error(`Unexpected response format from getFragment API: ${JSON.stringify(response)}`)
   }
 

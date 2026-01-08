@@ -1,3 +1,15 @@
+/**
+ * Graph Service - Graph Fragment Management
+ *
+ * ARCHITECTURAL COMPLIANCE:
+ * - All operations use Usable API (fragments) as the persistent store - NO direct database writes
+ * - All mutations (create, update, delete) emit events via Session Pathways for audit tracking
+ * - Read operations (get, list) query Usable fragments directly - no cache layer
+ * - This service follows the event-driven architecture pattern where:
+ *   - Services emit events via Session Pathways
+ *   - Event handlers (if needed) would process events and update state
+ *   - No direct db.insert(), db.update(), or db.delete() calls exist in this service
+ */
 import { randomUUID } from "node:crypto"
 import type { SessionPathwayBuilder } from "@flowcore/pathways"
 import { ulid } from "ulid"
@@ -8,6 +20,21 @@ import { usableApi } from "./usable-api.service"
 
 const GRAPHABLE_VERSION = "0.2.0"
 const GRAPHABLE_APP_TAG = "app:graphable"
+
+/**
+ * Type alias for SessionPathwayBuilder used in graph service mutation functions
+ * Used for emitting graph lifecycle events (created, updated, deleted)
+ */
+type GraphServiceSessionPathway = SessionPathwayBuilder<Record<string, { input: unknown; output: unknown }>>
+
+/**
+ * Type for SessionPathway with write() and getUserResolver() methods
+ * These methods exist at runtime but use a more specific type than the base SessionPathwayBuilder
+ */
+type TypedSessionPathway = GraphServiceSessionPathway & {
+  write(eventType: string, payload: { data: Record<string, unknown> }): Promise<string | string[]>
+  getUserResolver?: () => Promise<{ entityId: string; entityType: string }>
+}
 
 /**
  * Zod schema for parameter definition
@@ -233,7 +260,7 @@ export type UpdateGraphInput = z.infer<typeof updateGraphInputSchema>
  * Mutation function - requires SessionPathway
  */
 export async function createGraph(
-  sessionPathway: SessionPathwayBuilder<any>,
+  sessionPathway: GraphServiceSessionPathway,
   workspaceId: string,
   graphData: CreateGraphInput,
   accessToken: string
@@ -342,23 +369,19 @@ export async function createGraph(
   const graphId = fragment.id
 
   // Emit graph.created.0 event via Session Pathways
-  await (sessionPathway as any).write(
-    `${graphContract.FlowcoreGraph.flowType}/${graphContract.FlowcoreGraph.eventType.created}`,
-    {
-      data: {
-        graphId, // Fragment ID
-        fragmentId: graphId, // Same as graphId
-        workspaceId,
-        dataSourceRef: finalDataSourceRef, // Use validated/derived dataSourceRef
-        connectorRef: validatedData.connectorRef,
-        occurredAt: new Date().toISOString(),
-        initiatedBy: (sessionPathway as any).getUserResolver
-          ? (await (sessionPathway as any).getUserResolver()).entityId
-          : "system",
-        requestId: randomUUID(),
-      },
-    }
-  )
+  const typedPathway = sessionPathway as TypedSessionPathway
+  await typedPathway.write(`${graphContract.FlowcoreGraph.flowType}/${graphContract.FlowcoreGraph.eventType.created}`, {
+    data: {
+      graphId, // Fragment ID
+      fragmentId: graphId, // Same as graphId
+      workspaceId,
+      dataSourceRef: finalDataSourceRef, // Use validated/derived dataSourceRef
+      connectorRef: validatedData.connectorRef,
+      occurredAt: new Date().toISOString(),
+      initiatedBy: typedPathway.getUserResolver ? (await typedPathway.getUserResolver()).entityId : "system",
+      requestId: randomUUID(),
+    },
+  })
 
   return { graphId, status: "processing" }
 }
@@ -368,7 +391,7 @@ export async function createGraph(
  * Mutation function - requires SessionPathway
  */
 export async function updateGraph(
-  sessionPathway: SessionPathwayBuilder<any>,
+  sessionPathway: GraphServiceSessionPathway,
   workspaceId: string,
   graphId: string, // Fragment ID
   graphData: UpdateGraphInput,
@@ -426,23 +449,19 @@ export async function updateGraph(
   )
 
   // Emit graph.updated.0 event via Session Pathways
-  await (sessionPathway as any).write(
-    `${graphContract.FlowcoreGraph.flowType}/${graphContract.FlowcoreGraph.eventType.updated}`,
-    {
-      data: {
-        graphId, // Fragment ID
-        fragmentId: graphId, // Same as graphId
-        workspaceId,
-        dataSourceRef: validatedUpdatedData.dataSourceRef,
-        connectorRef: validatedUpdatedData.connectorRef,
-        occurredAt: new Date().toISOString(),
-        initiatedBy: (sessionPathway as any).getUserResolver
-          ? (await (sessionPathway as any).getUserResolver()).entityId
-          : "system",
-        requestId: randomUUID(),
-      },
-    }
-  )
+  const typedPathway = sessionPathway as TypedSessionPathway
+  await typedPathway.write(`${graphContract.FlowcoreGraph.flowType}/${graphContract.FlowcoreGraph.eventType.updated}`, {
+    data: {
+      graphId, // Fragment ID
+      fragmentId: graphId, // Same as graphId
+      workspaceId,
+      dataSourceRef: validatedUpdatedData.dataSourceRef,
+      connectorRef: validatedUpdatedData.connectorRef,
+      occurredAt: new Date().toISOString(),
+      initiatedBy: typedPathway.getUserResolver ? (await typedPathway.getUserResolver()).entityId : "system",
+      requestId: randomUUID(),
+    },
+  })
 
   return { graphId, status: "processing" }
 }
@@ -452,7 +471,7 @@ export async function updateGraph(
  * Mutation function - requires SessionPathway
  */
 export async function deleteGraph(
-  sessionPathway: SessionPathwayBuilder<any>,
+  sessionPathway: GraphServiceSessionPathway,
   workspaceId: string,
   graphId: string, // Fragment ID
   accessToken: string
@@ -467,21 +486,17 @@ export async function deleteGraph(
   await usableApi.deleteFragment(workspaceId, graphId, accessToken)
 
   // Emit graph.deleted.0 event via Session Pathways
-  await (sessionPathway as any).write(
-    `${graphContract.FlowcoreGraph.flowType}/${graphContract.FlowcoreGraph.eventType.deleted}`,
-    {
-      data: {
-        graphId, // Fragment ID
-        fragmentId: graphId, // Same as graphId
-        workspaceId,
-        occurredAt: new Date().toISOString(),
-        initiatedBy: (sessionPathway as any).getUserResolver
-          ? (await (sessionPathway as any).getUserResolver()).entityId
-          : "system",
-        requestId: randomUUID(),
-      },
-    }
-  )
+  const typedPathway = sessionPathway as TypedSessionPathway
+  await typedPathway.write(`${graphContract.FlowcoreGraph.flowType}/${graphContract.FlowcoreGraph.eventType.deleted}`, {
+    data: {
+      graphId, // Fragment ID
+      fragmentId: graphId, // Same as graphId
+      workspaceId,
+      occurredAt: new Date().toISOString(),
+      initiatedBy: typedPathway.getUserResolver ? (await typedPathway.getUserResolver()).entityId : "system",
+      requestId: randomUUID(),
+    },
+  })
 
   return { graphId, status: "processing" }
 }

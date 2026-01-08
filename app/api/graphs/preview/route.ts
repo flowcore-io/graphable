@@ -1,10 +1,11 @@
-import { authOptions } from "@/lib/auth"
-import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
-import * as graphExecutionService from "@/lib/services/graph-execution.service"
-import { getServerSession } from "next-auth"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
 import { z } from "zod"
+import { authOptions } from "@/lib/auth"
+import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
+import { createSessionPathwayForAPI } from "@/lib/pathways/session-provider"
+import * as graphExecutionService from "@/lib/services/graph-execution.service"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -85,6 +86,12 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) =
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
+    // Create session pathway for auditing (required for POST endpoints)
+    const sessionContext = await createSessionPathwayForAPI()
+    if (!sessionContext) {
+      return NextResponse.json({ error: "Failed to create session context" }, { status: 500 })
+    }
+
     // Parse and validate request body
     const body = await req.json()
     const validationResult = previewGraphSchema.safeParse(body)
@@ -159,7 +166,8 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) =
         },
         effectiveParameters,
         session.user.accessToken,
-        timeRange
+        timeRange,
+        sessionContext.pathway
       )
     } else if (query) {
       // Single query (legacy) - dataSourceRef is required
@@ -184,7 +192,8 @@ export const POST = requireWorkspace(async (req: NextRequest, { workspaceId }) =
         },
         effectiveParameters,
         session.user.accessToken,
-        timeRange
+        timeRange,
+        sessionContext.pathway
       )
     } else {
       return NextResponse.json({ error: "Either 'query' or 'queries' must be provided" }, { status: 400 })

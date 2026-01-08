@@ -1,3 +1,4 @@
+import type { SessionPathwayBuilder } from "@flowcore/pathways"
 import { Parser } from "expr-eval"
 import type { DashboardFragmentData } from "./dashboard.service"
 import * as dashboardService from "./dashboard.service"
@@ -8,6 +9,12 @@ import { validateParameters } from "./parameter-validation.service"
 import { validateSqlQuery } from "./sql-validation.service"
 
 /**
+ * Type alias for SessionPathwayBuilder used in graph execution functions
+ * Used for auditing graph execution and preview operations
+ */
+type GraphExecutionSessionPathway = SessionPathwayBuilder<Record<string, { input: unknown; output: unknown }>>
+
+/**
  * Execute a graph query via worker service
  * Returns result data for visualization
  * Supports both single query (legacy) and multiple queries with expressions
@@ -16,7 +23,8 @@ export async function executeGraph(
   workspaceId: string,
   graphId: string, // Fragment ID
   parameters: Record<string, unknown>,
-  accessToken: string
+  accessToken: string,
+  sessionPathway?: GraphExecutionSessionPathway
 ): Promise<{ data: unknown[]; columns: string[] }> {
   // Get graph fragment from Usable (graphId is the fragment ID)
   const graph = await graphService.getGraph(workspaceId, graphId, accessToken)
@@ -48,10 +56,24 @@ export async function executeGraph(
 
   // Support multiple queries (new) or single query (legacy)
   if (graph.queries && graph.queries.length > 0) {
-    return await executeMultipleQueries(graph, workspaceId, parametersWithDefaults, accessToken, disableTimeRange)
+    return await executeMultipleQueries(
+      graph,
+      workspaceId,
+      parametersWithDefaults,
+      accessToken,
+      disableTimeRange,
+      sessionPathway
+    )
   } else if (graph.query) {
     // Legacy single query support
-    return await executeSingleQuery(graph, workspaceId, parametersWithDefaults, accessToken, disableTimeRange)
+    return await executeSingleQuery(
+      graph,
+      workspaceId,
+      parametersWithDefaults,
+      accessToken,
+      disableTimeRange,
+      sessionPathway
+    )
   } else {
     throw new Error("Graph must have either 'query' or 'queries' defined")
   }
@@ -65,7 +87,8 @@ async function executeSingleQuery(
   workspaceId: string,
   parametersWithDefaults: Record<string, unknown>,
   accessToken: string,
-  disableTimeRange: boolean
+  disableTimeRange: boolean,
+  _sessionPathway?: GraphExecutionSessionPathway
 ): Promise<{ data: unknown[]; columns: string[] }> {
   // Inject time range filter if configured in graph and not disabled
   if (!graph.query) {
@@ -298,7 +321,8 @@ async function executeMultipleQueries(
   workspaceId: string,
   parametersWithDefaults: Record<string, unknown>,
   accessToken: string,
-  disableTimeRange: boolean
+  disableTimeRange: boolean,
+  _sessionPathway?: GraphExecutionSessionPathway
 ): Promise<{ data: unknown[]; columns: string[] }> {
   if (!graph.queries || graph.queries.length === 0) {
     throw new Error("Graph queries are required for multiple query execution")
@@ -672,7 +696,8 @@ export async function executeQuery(
   },
   parameters: Record<string, unknown>,
   accessToken: string,
-  timeRange?: "1h" | "7d" | "30d" | "90d" | "180d" | "365d" | "all" | "custom"
+  timeRange?: "1h" | "7d" | "30d" | "90d" | "180d" | "365d" | "all" | "custom",
+  _sessionPathway?: GraphExecutionSessionPathway
 ): Promise<{ data: unknown[]; columns: string[] }> {
   // Apply default values for missing optional parameters
   const parametersWithDefaults: Record<string, unknown> = { ...parameters }
@@ -762,7 +787,8 @@ export async function executeMultipleQueriesPreview(
   },
   parameters: Record<string, unknown>,
   accessToken: string,
-  timeRange?: "1h" | "7d" | "30d" | "90d" | "180d" | "365d" | "all" | "custom"
+  timeRange?: "1h" | "7d" | "30d" | "90d" | "180d" | "365d" | "all" | "custom",
+  _sessionPathway?: GraphExecutionSessionPathway
 ): Promise<{ data: unknown[]; columns: string[] }> {
   // Separate queries and expressions
   const sqlQueries = graphData.queries.filter((q) => "dialect" in q && q.dialect === "sql")

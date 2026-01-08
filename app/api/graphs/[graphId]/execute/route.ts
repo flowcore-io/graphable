@@ -1,10 +1,11 @@
-import { authOptions } from "@/lib/auth"
-import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
-import * as graphExecutionService from "@/lib/services/graph-execution.service"
-import { getServerSession } from "next-auth"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
 import { z } from "zod"
+import { authOptions } from "@/lib/auth"
+import { requireWorkspace } from "@/lib/middleware/api-workspace-guard"
+import { createSessionPathwayForAPI } from "@/lib/pathways/session-provider"
+import * as graphExecutionService from "@/lib/services/graph-execution.service"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -28,6 +29,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gra
       const session = await getServerSession(authOptions)
       if (!session?.user?.accessToken) {
         return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+      }
+
+      // Create session pathway for auditing (required for POST endpoints)
+      const sessionContext = await createSessionPathwayForAPI()
+      if (!sessionContext) {
+        return NextResponse.json({ error: "Failed to create session context" }, { status: 500 })
       }
 
       // Validate graphId format
@@ -55,7 +62,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gra
         workspaceId,
         graphId,
         validationResult2.data.parameters || {},
-        session.user.accessToken
+        session.user.accessToken,
+        sessionContext.pathway
       )
 
       return NextResponse.json(result)

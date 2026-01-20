@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.5](https://github.com/flowcore-io/graphable/compare/v1.2.4...v1.2.5) (2026-01-20)
+
+
+### Bug Fixes
+
+* add nativeButton prop to Button components with render prop ([e36b603](https://github.com/flowcore-io/graphable/commit/e36b6033f5006c779120963087159e5bc95d8596))
+* prevent error information leakage in data sources page ([2c07e89](https://github.com/flowcore-io/graphable/commit/2c07e89c815e5f3cf12b87ea07cc370e8ea33c46))
+
 ## [1.2.4](https://github.com/flowcore-io/graphable/compare/v1.2.3...v1.2.4) (2026-01-20)
 
 

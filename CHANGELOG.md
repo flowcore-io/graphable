@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/flowcore-io/graphable/compare/v1.1.0...v1.2.0) (2026-01-20)
+
+
+### Features
+
+* Add public test page and enhance authentication error handling ([c37b373](https://github.com/flowcore-io/graphable/commit/c37b373722cb9106d2bca66a8c5cb59c910774e0))
+
 ## [1.1.0](https://github.com/flowcore-io/graphable/compare/v1.0.0...v1.1.0) (2026-01-08)
 
 

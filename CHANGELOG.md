@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/flowcore-io/graphable/compare/v1.2.0...v1.2.1) (2026-01-20)
+
+
+### Bug Fixes
+
+* **auth:** Enhance NextAuth.js handlers with error logging and improve redirect logic ([5080bce](https://github.com/flowcore-io/graphable/commit/5080bce26739cfbb9b3e99e8bfb2503f43a7c6c3))
+* Update linter rules and enhance Azure configuration scripts ([0b7f97f](https://github.com/flowcore-io/graphable/commit/0b7f97f6b971de64009b83bb2cda14668d766860))
+
 ## [1.2.0](https://github.com/flowcore-io/graphable/compare/v1.1.0...v1.2.0) (2026-01-20)
 
 

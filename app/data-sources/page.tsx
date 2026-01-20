@@ -17,7 +17,7 @@ export default async function DataSourcesPage() {
     try {
       workspaceId = await getWorkspaceForUser(session.user.id)
     } catch (error) {
-      console.error("Failed to fetch workspace:", error)
+      console.error("Failed to fetch workspace:", error instanceof Error ? error.message : "Unknown error")
     }
   }
 
@@ -33,7 +33,7 @@ export default async function DataSourcesPage() {
     try {
       dataSources = await dataSourceService.listDataSources(workspaceId, session.user.accessToken)
     } catch (error) {
-      console.error("Failed to fetch data sources:", error)
+      console.error("Failed to fetch data sources:", error instanceof Error ? error.message : "Unknown error")
     }
   }
 

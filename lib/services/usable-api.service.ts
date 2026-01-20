@@ -97,6 +97,8 @@ export class UsableApiService {
           errorDetails: errorData.details ? JSON.stringify(errorData.details, null, 2) : undefined,
           endpoint,
           method: fetchOptions.method || "GET",
+          // Log token prefix for debugging (not the full token)
+          tokenPrefix: accessToken ? `${accessToken.substring(0, 20)}...` : undefined,
         })
         throw new Error(errorMessage)
       }

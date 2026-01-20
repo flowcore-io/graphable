@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/flowcore-io/graphable/compare/v1.2.1...v1.2.2) (2026-01-20)
+
+
+### Bug Fixes
+
+* exclude /api/health from middleware for k8s health checks ([3647625](https://github.com/flowcore-io/graphable/commit/36476251e9364a737bd87c6712c9a9aa2a3d9128))
+
 ## [1.2.1](https://github.com/flowcore-io/graphable/compare/v1.2.0...v1.2.1) (2026-01-20)
 
 

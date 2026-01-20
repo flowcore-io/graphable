@@ -1,11 +1,11 @@
+import { DatabaseIcon, PlusIcon } from "lucide-react"
+import Link from "next/link"
+import { getServerSession } from "next-auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { authOptions } from "@/lib/auth"
 import * as dataSourceService from "@/lib/services/data-source.service"
 import { getWorkspaceForUser } from "@/lib/services/tenant.service"
-import { DatabaseIcon, PlusIcon } from "lucide-react"
-import { getServerSession } from "next-auth"
-import Link from "next/link"
 
 export const dynamic = "force-dynamic"
 
@@ -47,6 +47,7 @@ export default async function DataSourcesPage() {
               <p className="text-sm text-muted-foreground">Manage your PostgreSQL data sources</p>
             </div>
             <Button
+              nativeButton={false}
               render={
                 <Link href="/data-sources/new" className="flex items-center">
                   <PlusIcon className="h-4 w-4 mr-2" />
@@ -63,6 +64,7 @@ export default async function DataSourcesPage() {
                 <h3 className="text-lg font-semibold mb-2">No data sources yet</h3>
                 <p className="text-sm text-muted-foreground mb-4">Create your first data source to get started</p>
                 <Button
+                  nativeButton={false}
                   render={
                     <Link href="/data-sources/new" className="flex items-center">
                       <PlusIcon className="h-4 w-4 mr-2" />
@@ -116,7 +118,7 @@ export default async function DataSourcesPage() {
           <p className="text-muted-foreground mb-6 max-w-md">
             You need to link a Usable workspace to get started with Graphable.
           </p>
-          <Button render={<Link href="/onboarding/link-workspace">Link Workspace</Link>} />
+          <Button nativeButton={false} render={<Link href="/onboarding/link-workspace">Link Workspace</Link>} />
         </div>
       )}
     </main>

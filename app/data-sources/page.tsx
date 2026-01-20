@@ -1,7 +1,7 @@
 import { DatabaseIcon, PlusIcon } from "lucide-react"
 import Link from "next/link"
 import { getServerSession } from "next-auth"
-import { buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { authOptions } from "@/lib/auth"
 import * as dataSourceService from "@/lib/services/data-source.service"
@@ -47,10 +47,15 @@ export default async function DataSourcesPage() {
               <h1 className="text-2xl font-bold">Data Sources</h1>
               <p className="text-sm text-muted-foreground">Manage your PostgreSQL data sources</p>
             </div>
-            <Link href="/data-sources/new" className={cn(buttonVariants(), "flex items-center")}>
-              <PlusIcon className="h-4 w-4 mr-2" />
-              New Data Source
-            </Link>
+            <Button
+              nativeButton={false}
+              render={
+                <Link href="/data-sources/new" className="flex items-center">
+                  <PlusIcon className="h-4 w-4 mr-2" />
+                  New Data Source
+                </Link>
+              }
+            />
           </div>
 
           {dataSources.length === 0 ? (

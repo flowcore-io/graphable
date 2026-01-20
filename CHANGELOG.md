@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.3](https://github.com/flowcore-io/graphable/compare/v1.2.2...v1.2.3) (2026-01-20)
+
+
+### Bug Fixes
+
+* add /health endpoint for Kubernetes probes ([b203bdc](https://github.com/flowcore-io/graphable/commit/b203bdc47b848871237a85294b74c3599ae7be22))
+* enable PKCE for Keycloak OAuth to prevent invalid_grant errors ([61b8509](https://github.com/flowcore-io/graphable/commit/61b8509a6738c8bd5ab0ea42f6a6589ec5493373))
+
+
+### Reverts
+
+* remove /health endpoint, use /api/health via manifest update ([9fa36a6](https://github.com/flowcore-io/graphable/commit/9fa36a6955b8f65e4f8f7d57e1549bb332f7f0ba))
+
 ## [1.2.2](https://github.com/flowcore-io/graphable/compare/v1.2.1...v1.2.2) (2026-01-20)
 
 

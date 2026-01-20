@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.4](https://github.com/flowcore-io/graphable/compare/v1.2.3...v1.2.4) (2026-01-20)
+
+
+### Bug Fixes
+
+* remove audience parameter from Keycloak config to fix production auth ([5e8e654](https://github.com/flowcore-io/graphable/commit/5e8e654fd678cc41b9f2d8366afdaeff2d1fd643))
+
 ## [1.2.3](https://github.com/flowcore-io/graphable/compare/v1.2.2...v1.2.3) (2026-01-20)
 
 

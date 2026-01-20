@@ -1,8 +1,8 @@
-import { env } from "@/lib/env"
-import { getOrCreateUser } from "@/lib/services/user.service"
 import type { DefaultSession, NextAuthOptions, Session } from "next-auth"
 import type { JWT } from "next-auth/jwt"
 import KeycloakProvider from "next-auth/providers/keycloak"
+import { env } from "@/lib/env"
+import { getOrCreateUser } from "@/lib/services/user.service"
 
 /**
  * Decode JWT ID token and extract usable_user_id claim
@@ -179,25 +179,39 @@ export const authOptions: NextAuthOptions = {
      * Prevents "not redirecting after authentication" issues
      */
     async redirect({ url, baseUrl }) {
+      console.log(`🔀 NextAuth redirect: ${url} -> baseUrl: ${baseUrl}`)
       // Allows relative callback URLs
-      if (url.startsWith("/")) return `${baseUrl}${url}`
+      if (url.startsWith("/")) {
+        const redirectUrl = `${baseUrl}${url}`
+        console.log(`✅ Redirecting to relative URL: ${redirectUrl}`)
+        return redirectUrl
+      }
       // Allows callback URLs on the same origin
-      else if (new URL(url).origin === baseUrl) return url
+      else if (new URL(url).origin === baseUrl) {
+        console.log(`✅ Redirecting to same origin: ${url}`)
+        return url
+      }
+      console.log(`✅ Redirecting to base URL: ${baseUrl}`)
       return baseUrl
     },
     async signIn({ user, account }) {
+      console.log(`🔐 signIn callback triggered for user: ${user.email}`)
+      console.log(`🔐 Account provider: ${account?.provider}`)
+      console.log(`🔐 Has ID token: ${!!account?.id_token}`)
+      console.log(`🔐 Has access token: ${!!account?.access_token}`)
+
       // REQUIRED: Check for Usable user ID in ID token
       // Users must have their Usable user ID synced to Keycloak before they can sign in
       if (account?.id_token) {
         const usableUserId = extractUsableUserId(account.id_token)
         if (!usableUserId) {
-          console.warn(`❌ User ${user.email} attempted sign-in but missing usable_user_id claim in ID token`)
+          console.error(`❌ User ${user.email} attempted sign-in but missing usable_user_id claim in ID token`)
           // Return false to reject sign-in - will redirect to error page
           return false
         }
         console.log(`✅ User ${user.email} has usable_user_id: ${usableUserId}`)
       } else {
-        console.warn(`⚠️  User ${user.email} signed in but no ID token available`)
+        console.error(`❌ User ${user.email} signed in but no ID token available`)
         // If no ID token, reject sign-in
         return false
       }
@@ -205,7 +219,7 @@ export const authOptions: NextAuthOptions = {
       console.log(`✅ User ${user.email} authorized to sign in`)
       return true
     },
-    async jwt({ token, user, account, profile }) {
+    async jwt({ token, user, account, profile: _profile }) {
       // Initial sign in
       if (account && user) {
         token.accessToken = account.access_token
@@ -224,12 +238,14 @@ export const authOptions: NextAuthOptions = {
           // CRITICAL: Create user record in database on first login
           // This is an exception to event-driven architecture (see fragment 98494836-ac30-4024-b87b-353bf34db603)
           try {
+            const startTime = Date.now()
             await getOrCreateUser(usableUserId, {
               email: user.email || "",
               name: user.name || undefined,
               image: user.image || undefined,
             })
-            console.log(`✅ User record created/verified in database for ${usableUserId}`)
+            const duration = Date.now() - startTime
+            console.log(`✅ User record created/verified in database for ${usableUserId} (took ${duration}ms)`)
           } catch (error) {
             // Don't block authentication if user creation fails
             // Log error but continue with authentication
@@ -250,6 +266,7 @@ export const authOptions: NextAuthOptions = {
           expiresAt: new Date(expiresAt).toISOString(),
         })
 
+        console.log("✅ JWT callback completed successfully")
         return token
       }
 
@@ -328,11 +345,13 @@ export const authOptions: NextAuthOptions = {
           }
         }
       }
+      console.log("✅ Session callback completed successfully")
       return session
     },
   },
   events: {
     async signIn({ user, account }) {
+      console.log(`✅ signIn event triggered for ${user.email}`)
       console.log(`User ${user.email} signed in via ${account?.provider}`)
     },
     async signOut() {

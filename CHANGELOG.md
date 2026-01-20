@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.6](https://github.com/flowcore-io/graphable/compare/v1.2.5...v1.2.6) (2026-01-20)
+
+
+### Bug Fixes
+
+* replace Button+render+Link with styled Link components ([309c7c8](https://github.com/flowcore-io/graphable/commit/309c7c8ad2bcb0b2e750d3f8521f9ec16c22dc16))
+* update DataSourcesPage to use Button component for new data source link ([341344e](https://github.com/flowcore-io/graphable/commit/341344ee9cdcb7047c12dc5a0d5d6e34f1f5986b))
+
 ## [1.2.5](https://github.com/flowcore-io/graphable/compare/v1.2.4...v1.2.5) (2026-01-20)
 
 

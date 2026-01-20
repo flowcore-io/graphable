@@ -1,42 +1,59 @@
+import { AlertCircle, RefreshCw } from "lucide-react"
+import Link from "next/link"
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { AlertCircle } from "lucide-react"
-import Link from "next/link"
 
 export default async function AuthErrorPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const params = await searchParams
   const error = params.error || "Unknown error"
 
-  const errorMessages: Record<string, string> = {
-    Configuration: "There is a problem with the server configuration.",
-    AccessDenied: "You do not have permission to sign in.",
-    Verification: "The verification link may have expired or been already used.",
-    OAuthSignin: "Error in constructing an authorization URL.",
-    OAuthCallback: "Error in handling the response from the OAuth provider.",
-    OAuthCreateAccount: "Could not create OAuth provider user in the database.",
-    EmailCreateAccount: "Could not create email provider user in the database.",
-    Callback: "Error in the OAuth callback handler route.",
-    OAuthAccountNotLinked: "Email already associated with another account.",
-    EmailSignin: "Check your email address.",
-    CredentialsSignin: "Sign in failed. Check the details you provided are correct.",
-    SessionRequired: "Please sign in to access this page.",
-    MissingUsableUserId:
-      "Your user account needs to be updated. Please sign in to usable.dev to sync your user information, then try again.",
-    Default: "Unable to sign in.",
+  const errorMessages: Record<string, { message: string; autoRetry?: boolean }> = {
+    Configuration: { message: "There is a problem with the server configuration." },
+    AccessDenied: { message: "You do not have permission to sign in." },
+    Verification: { message: "The verification link may have expired or been already used." },
+    OAuthSignin: { message: "Error in constructing an authorization URL." },
+    OAuthCallback: {
+      message: "Temporary issue connecting to authentication service. Retrying automatically...",
+      autoRetry: true,
+    },
+    OAuthCreateAccount: { message: "Could not create OAuth provider user in the database." },
+    EmailCreateAccount: { message: "Could not create email provider user in the database." },
+    Callback: {
+      message: "Temporary issue during authentication. Retrying automatically...",
+      autoRetry: true,
+    },
+    OAuthAccountNotLinked: { message: "Email already associated with another account." },
+    EmailSignin: { message: "Check your email address." },
+    CredentialsSignin: { message: "Sign in failed. Check the details you provided are correct." },
+    SessionRequired: { message: "Please sign in to access this page." },
+    MissingUsableUserId: {
+      message:
+        "Your user account needs to be updated. Please sign in to usable.dev to sync your user information, then try again.",
+    },
+    Default: { message: "Unable to sign in." },
   }
 
-  const errorMessage = errorMessages[error] || errorMessages.Default
+  const errorInfo = errorMessages[error] || errorMessages.Default
+  const errorMessage = errorInfo.message
+  const shouldAutoRetry = errorInfo.autoRetry || false
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted">
+    <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-background to-muted">
+      {shouldAutoRetry && <AutoRetryScript />}
       <div className="w-full max-w-md space-y-6 rounded-lg border bg-card p-8 shadow-lg">
         <div className="text-center">
           <div className="mb-4 flex justify-center">
-            <div className="rounded-full bg-destructive/10 p-3">
-              <AlertCircle className="h-10 w-10 text-destructive" />
+            <div className={cn("rounded-full p-3", shouldAutoRetry ? "bg-blue-500/10" : "bg-destructive/10")}>
+              {shouldAutoRetry ? (
+                <RefreshCw className="h-10 w-10 text-blue-500 animate-spin" />
+              ) : (
+                <AlertCircle className="h-10 w-10 text-destructive" />
+              )}
             </div>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Authentication Error</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {shouldAutoRetry ? "Retrying Authentication" : "Authentication Error"}
+          </h1>
           <p className="mt-2 text-muted-foreground">{errorMessage}</p>
         </div>
 
@@ -88,4 +105,13 @@ export default async function AuthErrorPage({ searchParams }: { searchParams: Pr
       </div>
     </div>
   )
+}
+
+/**
+ * Auto-retry component for OAuth callback errors
+ * Automatically redirects to sign-in page after 2 seconds
+ * This handles race conditions in multi-pod deployments where OAuth codes get consumed by multiple pods
+ */
+function AutoRetryScript() {
+  return <meta httpEquiv="refresh" content="2;url=/auth/signin" />
 }

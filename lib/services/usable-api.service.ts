@@ -69,31 +69,47 @@ export class UsableApiService {
     const { accessToken, ...fetchOptions } = options
     const url = `${this.baseUrl}${endpoint}`
 
-    const response = await fetch(url, {
-      ...fetchOptions,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-        ...fetchOptions.headers,
-      },
-    })
+    // Add timeout to prevent hanging requests (10 seconds for API calls)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000)
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      const errorMessage =
-        errorData.error || errorData.message || `Usable API error: ${response.status} ${response.statusText}`
-      logger.error("Usable API error", {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorData,
-        errorDetails: errorData.details ? JSON.stringify(errorData.details, null, 2) : undefined,
-        endpoint,
-        method: fetchOptions.method || "GET",
+    try {
+      const response = await fetch(url, {
+        ...fetchOptions,
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          ...fetchOptions.headers,
+        },
       })
-      throw new Error(errorMessage)
-    }
 
-    return response.json()
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage =
+          errorData.error || errorData.message || `Usable API error: ${response.status} ${response.statusText}`
+        logger.error("Usable API error", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+          errorDetails: errorData.details ? JSON.stringify(errorData.details, null, 2) : undefined,
+          endpoint,
+          method: fetchOptions.method || "GET",
+        })
+        throw new Error(errorMessage)
+      }
+
+      return response.json()
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error instanceof Error && error.name === "AbortError") {
+        logger.error("Usable API request timeout", { endpoint, timeout: "10s" })
+        throw new Error(`Usable API request timeout (10s): ${endpoint}`)
+      }
+      throw error
+    }
   }
 
   /**

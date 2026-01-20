@@ -1,5 +1,5 @@
-import { withAuth } from "next-auth/middleware"
 import { NextResponse } from "next/server"
+import { withAuth } from "next-auth/middleware"
 import { authOptions } from "./lib/auth"
 
 export default withAuth(
@@ -32,6 +32,7 @@ export default withAuth(
       authorized: ({ req, token }) => {
         const isOnAuthPage = req.nextUrl.pathname.startsWith("/auth")
         const isOnOnboardingPage = req.nextUrl.pathname.startsWith("/onboarding")
+        const isOnPublicTestPage = req.nextUrl.pathname.startsWith("/public-test")
 
         // Always allow access to auth pages
         if (isOnAuthPage) {
@@ -40,6 +41,11 @@ export default withAuth(
 
         // Always allow access to onboarding pages (they handle their own checks)
         if (isOnOnboardingPage) {
+          return true
+        }
+
+        // Always allow access to public test page (debugging/health check)
+        if (isOnPublicTestPage) {
           return true
         }
 

@@ -130,6 +130,8 @@ export const authOptions: NextAuthOptions = {
           scope: "openid email profile offline_access",
           // Request token with correct audience for MCP server
           audience: env.USABLE_CLIENT_ID,
+          // Enable PKCE (Proof Key for Code Exchange) to prevent double-submit and code replay attacks
+          code_challenge_method: "S256",
         },
       },
     }),

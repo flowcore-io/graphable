@@ -166,7 +166,7 @@
   }
 }
 
-/* Gridstack overrides */
+/* Gridstack overrides - !important needed to override Gridstack's inline styles */
 .grid-stack-item-content {
   overflow: visible !important;
 }

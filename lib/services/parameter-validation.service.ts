@@ -213,7 +213,7 @@ export function bindParametersToQuery(
     // Replace parameter placeholders in query
     // Support both $1, $2 style and :paramName style
     const placeholder1 = `$${paramIndex}`
-    const placeholder2 = `:${paramDef.name}`
+    const _placeholder2 = `:${paramDef.name}`
 
     // Replace :paramName style first (more specific)
     boundQuery = boundQuery.replace(new RegExp(`:${paramDef.name}\\b`, "g"), placeholder1)
@@ -224,7 +224,7 @@ export function bindParametersToQuery(
 
   // Replace remaining $N placeholders if query already uses them
   // This handles queries that already have $1, $2 placeholders
-  const finalParamIndex = 1
+  const _finalParamIndex = 1
   const finalParameterValues: unknown[] = []
 
   // Extract parameter values in order of appearance

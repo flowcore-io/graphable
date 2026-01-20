@@ -91,7 +91,6 @@ function NewGraphPageContent() {
   const [isLoadingDataSources, setIsLoadingDataSources] = useState(false)
 
   const form = useForm<CreateGraphFormData>({
-    // biome-ignore lint/suspicious/noExplicitAny: Type mismatch between zod schema and react-hook-form types due to union types in queries
     resolver: zodResolver(createGraphFormSchema) as any,
     defaultValues: {
       title: "",

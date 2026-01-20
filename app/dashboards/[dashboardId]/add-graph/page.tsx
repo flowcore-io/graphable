@@ -16,6 +16,23 @@ interface Graph {
   dataSourceRef: string
 }
 
+interface Dashboard {
+  id: string
+  title: string
+  description?: string
+  layout: {
+    tiles: Array<{
+      graphRef: string
+      position: {
+        x: number
+        y: number
+        w: number
+        h: number
+      }
+    }>
+  }
+}
+
 export default function AddGraphToDashboardPage() {
   const { workspaceId } = useWorkspace()
   const router = useRouter()
@@ -26,7 +43,7 @@ export default function AddGraphToDashboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedGraphId, setSelectedGraphId] = useState<string>("")
   const [graphs, setGraphs] = useState<Graph[]>([])
-  const [dashboard, setDashboard] = useState<any>(null)
+  const [dashboard, setDashboard] = useState<Dashboard | null>(null)
 
   useEffect(() => {
     if (!workspaceId || !dashboardId) return

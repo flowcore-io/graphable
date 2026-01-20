@@ -17,12 +17,14 @@ const handler = NextAuth(authOptions)
 /**
  * Wrap handlers with error logging for debugging 502 issues
  */
-export async function GET(req: Request, context: { params: { nextauth: string[] } }) {
+export async function GET(req: Request, context: { params: Promise<{ nextauth: string[] }> }) {
   const url = new URL(req.url)
   console.log(`🔐 [AUTH] GET ${url.pathname}${url.search}`)
 
   try {
-    const response = await handler(req, context)
+    // Await params as per Next.js 16 async params requirement
+    const params = await context.params
+    const response = await handler(req, { params })
     console.log(`✅ [AUTH] Response status: ${response.status}`)
     return response
   } catch (error) {
@@ -31,12 +33,14 @@ export async function GET(req: Request, context: { params: { nextauth: string[] 
   }
 }
 
-export async function POST(req: Request, context: { params: { nextauth: string[] } }) {
+export async function POST(req: Request, context: { params: Promise<{ nextauth: string[] }> }) {
   const url = new URL(req.url)
   console.log(`🔐 [AUTH] POST ${url.pathname}`)
 
   try {
-    const response = await handler(req, context)
+    // Await params as per Next.js 16 async params requirement
+    const params = await context.params
+    const response = await handler(req, { params })
     console.log(`✅ [AUTH] Response status: ${response.status}`)
     return response
   } catch (error) {

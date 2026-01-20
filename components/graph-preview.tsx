@@ -44,7 +44,7 @@ interface ExecutionResult {
  * Executes the query and displays the visualization as the user types
  */
 export function GraphPreview({ formData, workspaceId }: GraphPreviewProps) {
-  const { timeRange, refreshTrigger, parameters, setExecutePreview, triggerRefresh } = useGraphEditor()
+  const { timeRange, refreshTrigger, parameters, setExecutePreview, triggerRefresh: _triggerRefresh } = useGraphEditor()
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -305,8 +305,8 @@ export function GraphPreview({ formData, workspaceId }: GraphPreviewProps) {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        {columns.map((col, colIndex) => (
-                          <TableHead key={`${col}-${colIndex}`}>{col}</TableHead>
+                        {columns.map((col) => (
+                          <TableHead key={col}>{col}</TableHead>
                         ))}
                       </TableRow>
                     </TableHeader>
@@ -315,8 +315,8 @@ export function GraphPreview({ formData, workspaceId }: GraphPreviewProps) {
                         const rowKey = `${String(row[columns[0]] ?? "")}-${index}`
                         return (
                           <TableRow key={rowKey}>
-                            {columns.map((col, colIndex) => (
-                              <TableCell key={`${col}-${colIndex}`}>{String(row[col] ?? "")}</TableCell>
+                            {columns.map((col) => (
+                              <TableCell key={col}>{String(row[col] ?? "")}</TableCell>
                             ))}
                           </TableRow>
                         )

@@ -114,6 +114,56 @@
           }
         }
       }
+    },
+    {
+      "includes": ["components/queries-editor.tsx"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["lib/services/*.service.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["lib/middleware/*.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["app/globals.css"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noImportantStyles": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["app/dashboards/\\[dashboardId\\]/graphs/new/page.tsx"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
     }
   ],
   "javascript": {

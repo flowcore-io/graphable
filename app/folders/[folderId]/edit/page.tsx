@@ -28,7 +28,7 @@ export default function EditFolderPage() {
   const [name, setName] = useState("")
   const [parentFolderId, setParentFolderId] = useState<string | null | undefined>(undefined)
   const [folders, setFolders] = useState<Folder[]>([])
-  const [allFolders, setAllFolders] = useState<Folder[]>([]) // Keep all folders for parent name lookup
+  const [_allFolders, setAllFolders] = useState<Folder[]>([]) // Keep all folders for parent name lookup
 
   useEffect(() => {
     if (!workspaceId || !folderId) return

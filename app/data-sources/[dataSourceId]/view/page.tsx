@@ -31,6 +31,7 @@ export default function DataSourceViewPage() {
   const [queryResult, setQueryResult] = useState<QueryResult | null>(null)
   const [tables, setTables] = useState<Array<{ name: string; schema?: string }>>([])
   const [showTables, setShowTables] = useState(true)
+  // biome-ignore lint/suspicious/noExplicitAny: Monaco Editor typing is complex
   const editorRef = useRef<any>(null)
 
   useEffect(() => {
@@ -119,6 +120,7 @@ export default function DataSourceViewPage() {
     }
   }
 
+  // biome-ignore lint/suspicious/noExplicitAny: Monaco Editor typing is complex
   const handleEditorDidMount = (editor: any) => {
     editorRef.current = editor
     // Configure SQL language
@@ -204,9 +206,10 @@ export default function DataSourceViewPage() {
                   <p className="text-sm text-muted-foreground">No tables found</p>
                 ) : (
                   <div className="space-y-1">
-                    {tables.map((table, idx) => (
+                    {tables.map((table) => (
                       <button
-                        key={idx}
+                        key={table.schema ? `${table.schema}.${table.name}` : table.name}
+                        type="button"
                         onClick={() => handleTableClick(table.name, table.schema)}
                         className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted flex items-center gap-2"
                       >
@@ -332,18 +335,22 @@ export default function DataSourceViewPage() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          (queryResult.rows as Record<string, unknown>[]).map((row, rowIdx) => (
-                            <TableRow key={rowIdx}>
-                              {queryResult.columns.map((col) => (
-                                <TableCell key={col} className="font-mono text-xs">
-                                  {(row as Record<string, unknown>)[col] !== null &&
-                                  (row as Record<string, unknown>)[col] !== undefined
-                                    ? String((row as Record<string, unknown>)[col])
-                                    : "NULL"}
-                                </TableCell>
-                              ))}
-                            </TableRow>
-                          ))
+                          (queryResult.rows as Record<string, unknown>[]).map((row, rowIdx) => {
+                            // Generate unique key from page and row index for query results
+                            const rowKey = `${queryResult.page}-${rowIdx}`
+                            return (
+                              <TableRow key={rowKey}>
+                                {queryResult.columns.map((col) => (
+                                  <TableCell key={col} className="font-mono text-xs">
+                                    {(row as Record<string, unknown>)[col] !== null &&
+                                    (row as Record<string, unknown>)[col] !== undefined
+                                      ? String((row as Record<string, unknown>)[col])
+                                      : "NULL"}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                            )
+                          })
                         )}
                       </TableBody>
                     </Table>

@@ -23,11 +23,9 @@ export interface LogContext {
  * that can be easily replaced with a proper logging library (like pino or winston) later.
  */
 class LoggerService {
-  private readonly isDevelopment: boolean
   private readonly isProduction: boolean
 
   constructor() {
-    this.isDevelopment = env.NODE_ENV === "development"
     this.isProduction = env.NODE_ENV === "production"
   }
 

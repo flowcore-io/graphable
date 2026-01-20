@@ -11,7 +11,7 @@ export const runtime = "nodejs"
  * Test data source connection
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ dataSourceId: string }> }) {
-  return requireWorkspace(async (_request: NextRequest, { workspaceId, accessToken }) => {
+  return requireWorkspace(async (_request: NextRequest, { workspaceId, accessToken: _accessToken }) => {
     try {
       const { dataSourceId } = await params
 

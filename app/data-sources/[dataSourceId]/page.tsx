@@ -42,6 +42,7 @@ export default function DataSourceViewPage() {
   const [showTables, setShowTables] = useState(true)
   const [isEditorCollapsed, setIsEditorCollapsed] = useState(false)
   const [editorHeight, setEditorHeight] = useState(300)
+  // biome-ignore lint/suspicious/noExplicitAny: Monaco Editor typing is complex
   const editorRef = useRef<any>(null)
   const editorContainerRef = useRef<HTMLDivElement>(null)
 
@@ -173,6 +174,7 @@ export default function DataSourceViewPage() {
     }
   }
 
+  // biome-ignore lint/suspicious/noExplicitAny: Monaco Editor typing is complex
   const handleEditorDidMount = (editor: any) => {
     editorRef.current = editor
     // Configure SQL language

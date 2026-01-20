@@ -61,8 +61,7 @@ interface GraphCreationModalProps {
 export function GraphCreationModal({
   open,
   onOpenChange,
-  // biome-ignore lint/correctness/noUnusedVariables: Parent component handles dashboard updates
-  dashboardId,
+  dashboardId: _dashboardId,
   workspaceId,
   onGraphCreated,
 }: GraphCreationModalProps) {

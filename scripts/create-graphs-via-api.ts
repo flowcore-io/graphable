@@ -16,7 +16,7 @@ import * as dotenv from "dotenv"
 // Load environment variables
 dotenv.config()
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001"
 const WORKSPACE_ID = "f37b9773-0e9f-4ccd-8e85-05c5971af264" // My Life workspace
 const DASHBOARD_ID = "c68256b6-ba84-411a-8575-8f8e693c1977" // MrDashy dashboard
 const DATA_SOURCE_ID = "8f6ff67c-3614-42a9-8580-593efde93cf1" // tk-child-db

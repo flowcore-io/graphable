@@ -3,7 +3,7 @@
   "version": "1.2.6",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
@@ -17,8 +17,8 @@
     "flowcore:apply:production": "flowcore apply --v2 -f flowcore.yml && flowcore scenario apply -f flowcore.scenario.yml",
     "flowcore:apply:dev": "flowcore apply --v2 -f flowcore.yml -f flowcore.local.yml",
     "flowcore:stream": "flowcore scenario local -f flowcore.scenario.yml -f flowcore.scenario.local.yml -f flowcore.local.development.yml -s now -e http://localhost:3001/api -H \"X-Secret: 1234\"",
-    "flowcore:backfill": "flowcore scenario local -f flowcore.scenario.yml -f flowcore.scenario.local.yml -f flowcore.local.development.yml -s first -t 30000 -e http://localhost:3000/api -H \"X-Secret: 1234\"",
-    "flowcore:backfill-open": "flowcore scenario local -f flowcore.scenario.yml -f flowcore.scenario.local.yml -f flowcore.local.development.yml -t 30000 -e http://localhost:3000/api -H \"X-Secret: 1234\""
+    "flowcore:backfill": "flowcore scenario local -f flowcore.scenario.yml -f flowcore.scenario.local.yml -f flowcore.local.development.yml -s first -t 30000 -e http://localhost:3001/api -H \"X-Secret: 1234\"",
+    "flowcore:backfill-open": "flowcore scenario local -f flowcore.scenario.yml -f flowcore.scenario.local.yml -f flowcore.local.development.yml -t 30000 -e http://localhost:3001/api -H \"X-Secret: 1234\""
   },
   "dependencies": {
     "@azure/identity": "^4.13.0",

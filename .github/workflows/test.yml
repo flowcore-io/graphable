@@ -40,7 +40,7 @@ jobs:
         env:
           # Standardized dummy environment variables for testing
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/test"
-          NEXTAUTH_URL: "http://localhost:3000"
+          NEXTAUTH_URL: "http://localhost:3001"
           NEXTAUTH_SECRET: "dummy-nextauth-secret-min-32-chars-long"
           USABLE_CLIENT_ID: "dummy-client-id"
           USABLE_CLIENT_SECRET: "dummy-client-secret"
@@ -50,11 +50,3 @@ jobs:
           FLOWCORE_WEBHOOK_BASE_URL: "https://dummy.com"
           FLOWCORE_WEBHOOK_API_KEY: "dummy-api-key"
           FLOWCORE_TRANSFORMER_SECRET: "dummy-transformer-secret"
-
-
-
-
-
-
-
-

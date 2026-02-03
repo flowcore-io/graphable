@@ -17,7 +17,7 @@ scenario:
       parameters:
         - name: PROXY_ENDPOINT
           type: manual
-          value: "http://graphable.public-sites:3000/api/transformer"
+          value: "http://graphable.public-sites:3001/api/transformer"
         - name: PROXY_HEADER_SECRET
           type: secret
           value: graphable-webhook-secret
@@ -35,7 +35,7 @@ scenario:
       parameters:
         - name: PROXY_ENDPOINT
           type: manual
-          value: "http://graphable.public-sites:3000/api/transformer"
+          value: "http://graphable.public-sites:3001/api/transformer"
         - name: PROXY_HEADER_SECRET
           type: secret
           value: graphable-webhook-secret
@@ -53,7 +53,7 @@ scenario:
       parameters:
         - name: PROXY_ENDPOINT
           type: manual
-          value: "http://graphable.public-sites:3000/api/transformer"
+          value: "http://graphable.public-sites:3001/api/transformer"
         - name: PROXY_HEADER_SECRET
           type: secret
           value: graphable-webhook-secret
@@ -71,7 +71,7 @@ scenario:
       parameters:
         - name: PROXY_ENDPOINT
           type: manual
-          value: "http://graphable.public-sites:3000/api/transformer"
+          value: "http://graphable.public-sites:3001/api/transformer"
         - name: PROXY_HEADER_SECRET
           type: secret
           value: graphable-webhook-secret
@@ -89,7 +89,7 @@ scenario:
       parameters:
         - name: PROXY_ENDPOINT
           type: manual
-          value: "http://graphable.public-sites:3000/api/transformer"
+          value: "http://graphable.public-sites:3001/api/transformer"
         - name: PROXY_HEADER_SECRET
           type: secret
           value: graphable-webhook-secret
